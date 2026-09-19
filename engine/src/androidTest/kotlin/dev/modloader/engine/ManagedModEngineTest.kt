@@ -36,6 +36,14 @@ class ManagedModEngineTest {
     }
     private fun active(storage: File): Boolean = JSONArray(ManagedModEngine(storage).list()).getJSONObject(0).getBoolean("active")
 
+    @Test fun missingGameDataIsReportedWithoutCreatingGameDirectories() {
+        val storage = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, UUID.randomUUID().toString()).apply { mkdir() }
+        try {
+            try { ManagedModEngine(storage).list(); fail("Missing game data expected") }
+            catch (e: dev.modloader.domain.EngineFailure) { assertEquals(12, e.code) }
+            assertFalse(File(storage, "Android/data/${GameTarget.PACKAGE_NAME}").exists())
+        } finally { storage.deleteRecursively() }
+    }
     @Test fun discardDoesNotResumeOrRemoveIncompleteRecovery() = fixture { storage, bundles, zip ->
         val engine = ManagedModEngine(storage)
         val id = store(engine, zip)

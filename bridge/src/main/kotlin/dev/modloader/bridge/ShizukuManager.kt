@@ -32,7 +32,7 @@ class ShizukuManager(context: Context) : AutoCloseable {
     private var remoteBinder: IBinder? = null
     private val args = Shizuku.UserServiceArgs(ComponentName(context, PrivilegedFileService::class.java))
         .tag("modloader-v1-u${android.os.Process.myUid() / 100000}")
-        .version(12).processNameSuffix("modengine").daemon(false).debuggable(false)
+        .version(13).processNameSuffix("modengine").daemon(false).debuggable(false)
     private val timeout = Runnable { failAttempt() }
     private val retry = Runnable { beginAttempt() }
     private val death = IBinder.DeathRecipient { main.post { disconnected() } }

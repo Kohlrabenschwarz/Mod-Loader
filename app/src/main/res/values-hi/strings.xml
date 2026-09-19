@@ -79,4 +79,5 @@
     <string name="download_update">अपडेट डाउनलोड करें</string>
     <string name="update_available">संस्करण %1$s उपलब्ध है</string>
     <string name="update_install_hint">डाउनलोड ब्राउज़र में खुलेगा। APK खोलें और Android में इंस्टॉल करने की पुष्टि करें।</string>
+    <string name="game_data_missing">गेम डेटा नहीं मिला। Shadow Fight Arena इंस्टॉल करें, खोलें और उसका डेटा डाउनलोड पूरा करें।</string>
 </resources>

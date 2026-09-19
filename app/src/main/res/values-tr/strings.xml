@@ -79,4 +79,5 @@
     <string name="download_update">Güncellemeyi indir</string>
     <string name="update_available">%1$s sürümü hazır</string>
     <string name="update_install_hint">İndirme tarayıcıda açılır. APK dosyasını açıp Android kurulumunu onaylayın.</string>
+    <string name="game_data_missing">Oyun verileri bulunamadı. Shadow Fight Arena oyununu kurun, açın ve veri indirmesini tamamlayın.</string>
 </resources>

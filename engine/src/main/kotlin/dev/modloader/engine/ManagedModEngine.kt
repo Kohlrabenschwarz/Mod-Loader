@@ -17,8 +17,10 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
     private val pkg = GameTarget.PACKAGE_NAME
     private val root get() = SafeFs.checked(storage, "Android/data/$pkg")
     private fun mods(): File {
-        check(SafeFs.checked(root, GameTarget.RELATIVE_RESOURCES).isDirectory) { "Bundles klasörü henüz yok" }
-        return SafeFs.checked(root, "${GameTarget.RELATIVE_RESOURCES}/mods").also(SafeFs::mkdir)
+        val gameRoot = root
+        if (!gameRoot.isDirectory || !SafeFs.checked(gameRoot, GameTarget.RELATIVE_RESOURCES).isDirectory)
+            throw EngineFailure(12, "GAME_DATA_MISSING")
+        return SafeFs.checked(gameRoot, "${GameTarget.RELATIVE_RESOURCES}/mods").also(SafeFs::mkdir)
     }
     private fun validId(id: String): String {
         require(UUID.fromString(id).toString() == id); return id

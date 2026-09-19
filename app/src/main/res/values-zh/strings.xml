@@ -79,4 +79,5 @@
     <string name="download_update">下载更新</string>
     <string name="update_available">版本 %1$s 已发布</string>
     <string name="update_install_hint">将在浏览器中下载。打开 APK 文件并在 Android 中确认安装。</string>
+    <string name="game_data_missing">未找到游戏数据。请安装并打开 Shadow Fight Arena，然后完成数据下载。</string>
 </resources>

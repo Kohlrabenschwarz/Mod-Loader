@@ -79,4 +79,5 @@
     <string name="download_update">Download update</string>
     <string name="update_available">Version %1$s is available</string>
     <string name="update_install_hint">Download opens in your browser. Open the APK and confirm installation in Android.</string>
+    <string name="game_data_missing">Game data was not found. Install Shadow Fight Arena, open it, and finish downloading its data.</string>
 </resources>

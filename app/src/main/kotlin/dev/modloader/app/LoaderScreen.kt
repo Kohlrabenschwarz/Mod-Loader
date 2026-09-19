@@ -226,6 +226,7 @@ private fun errorText(code: Int): Int = when (code) {
     9 -> R.string.error_limit
     10 -> R.string.error_game
     11 -> R.string.no_base_backup
+    12 -> R.string.game_data_missing
     else -> R.string.operation_error
 }
 

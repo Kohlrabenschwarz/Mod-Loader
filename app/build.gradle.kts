@@ -6,7 +6,7 @@ android {
         applicationId = "dev.kohlrabenschwarz.ml"
         minSdk = 30
         targetSdk = 35
-        versionCode = 12
+        versionCode = 13
         versionName = "0.9.0"
     }
     buildFeatures { compose = true }
