@@ -1,0 +1,1 @@
+-keep class dev.modloader.engine.PrivilegedFileService { public <init>(android.content.Context); *; }
