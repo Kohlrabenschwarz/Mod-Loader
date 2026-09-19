@@ -110,7 +110,7 @@ The service authenticates Binder callers and restricts the target package and us
 
 ## Build
 
-Use JDK 17 or 21 and Android SDK Platform 35. The checked-in wrapper uses Gradle 8.10.2; AGP is 8.8.2 and Kotlin is 2.1.20. Current version: **0.9.0**, version code **12**, application ID **dev.kohlrabenschwarz.ml**.
+Use JDK 17 or 21 and Android SDK Platform 35. The checked-in wrapper uses Gradle 8.10.2; AGP is 8.8.2 and Kotlin is 2.1.20. Current version: **0.9.0**, version code **13**, application ID **dev.kohlrabenschwarz.ml**.
 
 ```sh
 ./gradlew :domain:test :app:assembleDebug :app:lintDebug
@@ -123,7 +123,7 @@ On Windows use `gradlew.bat`. See [ANDROID_STUDIO.md](ANDROID_STUDIO.md) for UI 
 
 ## Verification
 
-The project has passing JVM parser/path tests, builds debug and minified release variants, and compiles the Android test APK. The first public release has **not been installed or gameplay-tested on a physical device in this workspace**. Do not interpret a successful build as verified compatibility with every device or game update. Exact checks and remaining limitations are in [VALIDATION.md](VALIDATION.md).
+The signed release installed, updated in place, and launched on an Android 14/API 34 emulator. **24 JVM tests and 31 isolated Android engine tests passed.** Shizuku connected successfully. Shadow Fight Arena was not installed on that test device, so real-game storage access and gameplay compatibility remain unverified. Exact checks and remaining limitations are in [VALIDATION.md](VALIDATION.md).
 
 ## License and credits
 
