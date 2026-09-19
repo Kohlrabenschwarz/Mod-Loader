@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "name": "Generic Mod - Import Test",
+  "version": "1.0.0",
+  "creator": "Mod Loader contributors",
+  "description": "Template for testing mod cards, icons, metadata, and extensionless file imports. Payload files are dummy data, not real game bundles. Replace the payload and affectedFiles list when creating a real mod.",
+  "icon": "icon.png",
+  "affectedFiles": [
+    "5a9e13d8bc7844df970f612ea7d306c2",
+    "b074ce9261ad4e8ab2597380cfed615a"
+  ]
+}
