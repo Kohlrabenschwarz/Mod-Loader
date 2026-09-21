@@ -9,3 +9,4 @@ gradlew.bat text eol=crlf
 *.png binary
 *.zip binary
 *.jar binary
+examples/generic-mod/payload/* binary

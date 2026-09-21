@@ -1,6 +1,6 @@
 # Third-party notices
 
-The project's GPLv3 license does not change the licenses of any third-party components. Those components can be used independently under their own terms. This inventory records the resolved **releaseRuntimeClasspath** for version 0.9.0, including platform/BOM metadata and transitive dependencies; not every coordinate contributes runtime bytecode.
+The project's GPLv3 license does not change the licenses of any third-party components. Those components can be used independently under their own terms. This inventory records the resolved **releaseRuntimeClasspath** for version 1.0.0, including platform/BOM metadata and transitive dependencies; not every coordinate contributes runtime bytecode.
 
 ## Attribution
 
@@ -104,8 +104,8 @@ Game artwork and trademarks are separate from software dependency licenses; see 
 | `dev.rikka.shizuku:api:13.1.5` | MIT License | [Project](https://github.com/RikkaApps/Shizuku-API) |
 | `dev.rikka.shizuku:provider:13.1.5` | MIT License | [Project](https://github.com/RikkaApps/Shizuku-API) |
 | `dev.rikka.shizuku:shared:13.1.5` | MIT License | [Project](https://github.com/RikkaApps/Shizuku-API) |
-| `org.jetbrains.kotlin:kotlin-stdlib-common:2.1.20` | The Apache License, Version 2.0 | [Project](https://kotlinlang.org/) |
-| `org.jetbrains.kotlin:kotlin-stdlib:2.1.20` | The Apache License, Version 2.0 | [Project](https://kotlinlang.org/) |
+| `org.jetbrains.kotlin:kotlin-stdlib-common:2.4.20` | The Apache License, Version 2.0 | [Project](https://kotlinlang.org/) |
+| `org.jetbrains.kotlin:kotlin-stdlib:2.4.20` | The Apache License, Version 2.0 | [Project](https://kotlinlang.org/) |
 | `org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2` | Apache-2.0 | [Project](https://github.com/Kotlin/kotlinx.coroutines) |
 | `org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.10.2` | Apache-2.0 | [Project](https://github.com/Kotlin/kotlinx.coroutines) |
 | `org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2` | Apache-2.0 | [Project](https://github.com/Kotlin/kotlinx.coroutines) |
