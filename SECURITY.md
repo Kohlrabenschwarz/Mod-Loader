@@ -29,12 +29,3 @@ If a public issue is sufficient, ordinary crashes, translation mistakes, and com
 File replacement is durable and atomic per file, with verified backups and recovery journals. It is not atomic across a whole multi-file mod. A process with independent shell-level access can still attempt a parent-directory replacement race during the small gap between `lstat` validation and path-based file operations. Final file opens reject symlinks, but fully addressing parent-directory races requires a directory-file-descriptor backend using native `openat` operations.
 
 Backups are stored in the game's external data directory and are not encrypted. Clearing the game's data, uninstall behavior on some devices, another shell-level tool, or manual deletion can remove them. Keep original mod archives separately.
-
-## Release hygiene
-
-- Keep the PKCS#12 release key and all passwords outside the repository.
-- Increase `versionCode` for every APK update and sign it with the established release certificate.
-- Verify `gradle/wrapper/gradle-wrapper.jar` and the pinned distribution checksum before release.
-- Review Dependabot pull requests monthly and update only after the complete verification suite passes.
-- Run JVM tests, Android lint, release assembly, and isolated Android instrumentation tests on a disposable device.
-- Publish the exact tested signed APK and record its SHA-256 in the release notes.

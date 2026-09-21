@@ -18,7 +18,7 @@ Nekki’s rules prohibit modifications to Shadow Fight 4: Arena, including cosme
 
 Mod ZIPs are supplied by users and third parties. The app performs strict archive, path, size, checksum, and `UnityFS` header checks, but those checks cannot prove that a file is safe, lawful, authentic, compatible, or free of malicious content. You are responsible for the files you choose, the rights to use them, independent backups, and the consequences of modifying game data.
 
-Read the complete [User Agreement and Risk Notice](TERMS.md). The same agreement is included in the app in English, Turkish, German, Hindi, Russian, and Simplified Chinese and must be accepted before Shizuku starts.
+Read the complete [User Agreement and Risk Notice](TERMS.md). The same agreement is included in the app in English, Turkish, German, Hindi, Russian, and Simplified Chinese.
 
 ## What the app can do
 
@@ -26,19 +26,18 @@ Read the complete [User Agreement and Risk Notice](TERMS.md). The same agreement
 - **Import extensionless Unity bundles.** Payload filenames are preserved exactly. A `.bundle` extension is neither required nor added.
 - **Show every target before activation.** The confirmation screen lists the complete set of files a mod will affect.
 - **Activate and deactivate safely.** Original game files are backed up before replacement. Files introduced by a mod are removed when that mod is disabled.
-- **Remember state across restarts.** The authoritative state is stored beside each archived mod and reconciled after Shizuku reconnects.
 - **Recover interrupted work.** Transaction journals allow the engine to continue recovery after a disconnect, crash, or process restart.
 - **Detect outside changes.** SHA-256 records track both the original and modified versions of every affected file. A warning appears if a game update or another tool changes them.
 - **Offer deliberate warning actions.** From the warning panel you can recover saved base files, delete the stored mod and its backups while leaving current game files alone, or hide the warning without disabling integrity checks.
 - **Prevent active-mod conflicts.** Two active mods cannot manage the same destination file at the same time.
 - **Launch the game.** The Play button stops the existing game process through the supported Shizuku service when available, then opens the game using Android’s normal launcher intent.
 - **Check for app updates.** Stable GitHub releases are checked at startup. Downloads open in the browser and installation remains under the user’s control.
-- **Adapt to the user.** The interface supports English, Turkish, German, Hindi, Russian, and Simplified Chinese, plus light/dark mode and six accent colors. New installations begin in English.
+- **Adapt to the user.** The interface supports English, Turkish, German, Hindi, Russian, and Simplified Chinese, plus light/dark mode and six accent colors.
 
 ## Requirements
 
 - Android 11/API 30 or newer on the primary Android user.
-- [Shizuku](https://shizuku.rikka.app/) running through ADB or wireless debugging as shell UID 2000.
+- [Shizuku](https://shizuku.rikka.app/) running through ADB or wireless debugging. You can also use our [Modded Shizuku](https://github.com/Kohlrabenschwarz/Shizuku) when it provides the supported ADB shell backend; root/Sui mode remains unsupported.
 - Shadow Fight 4: Arena installed and opened at least once so its game data can be downloaded.
 - Enough free space for the imported ZIP, staging files, original backups, and recovery copies.
 
@@ -55,7 +54,7 @@ Mod Loader does not patch the game APK, inject native code into the game process
 
 ## Installing and using Mod Loader
 
-1. Download `Mod-Loader-v1.0.0-release.apk` from the latest GitHub Release.
+1. Download the latest  APK from GitHub Release.
 2. Verify the SHA-256 checksum shown in that release if you want to confirm the download.
 3. Install and start Shizuku, then open Mod Loader. The app attempts to connect up to three times and shows a green status card when it is ready.
 4. Read the agreement. You can change its language before accepting it.
@@ -67,11 +66,6 @@ Tap a mod card to expand its information. Hold the card to open recovery and del
 
 If the game is missing or has not created its data directory yet, install it, open it, finish its data download, and try again. A red Shizuku card means the privileged connection or permission is unavailable.
 
-### Moving from an older package ID
-
-Builds before 0.9.0 used `dev.modloader.app`. Version 1.0.0 uses `dev.kohlrabenschwarz.ml`, so Android treats the two packages as separate applications. Before moving, finish pending operations, disable active mods, and keep copies of your ZIP files. Local preferences and unarchived imports do not move automatically. Archived mods under `Bundles/mods/` can be rediscovered after the new app connects.
-
-Future updates signed with the same Kohlrabenschwarz certificate and a higher `versionCode` can install over version 1.0.0.
 
 ## How storage, backups, and recovery work
 
@@ -165,12 +159,7 @@ Helpful guides:
 - [Android Studio and Compose previews](ANDROID_STUDIO.md)
 - [Contributing](CONTRIBUTING.md)
 - [Creating a release](docs/RELEASING.md)
-- [Release validation and known limits](VALIDATION.md)
 - [Security policy](SECURITY.md)
-
-## Release status
-
-Version 1.0.0 uses application ID `dev.kohlrabenschwarz.ml`, version code 14, minimum API 30, and target API 35. The final signed APK passes 32 distinct JVM tests, Android lint with no errors, signature verification, and ZIP alignment verification. The engine previously passed 36 Android instrumentation tests on Android 14/API 34. Shadow Fight Arena was not installed on that test device, so real-game compatibility remains unverified. Full details are recorded in [VALIDATION.md](VALIDATION.md).
 
 ## License and acknowledgements
 
@@ -180,4 +169,4 @@ The launcher artwork has separate rights and is excluded from the GPL grant. It 
 
 Thanks to RikkaApps and Shizuku contributors, Google and the Android Open Source Project, JetBrains and Kotlin contributors, Gradle contributors, and the maintainers of the libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-**Code changes and this README were prepared with OpenAI Codex (GPT-6 Astra).**
+**Code changes and this README were prepared with OpenAI Codex (GPT-6 Astra, GPT-5.6 SOL).**
