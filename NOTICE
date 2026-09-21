@@ -1,0 +1,10 @@
+Mod Loader
+Copyright (c) 2026 Kohlrabenschwarz and contributors for their respective contributions.
+
+Original project source code and documentation are licensed under GNU GPL
+version 3 only (SPDX: GPL-3.0-only). See LICENSE for the complete terms.
+Third-party libraries, Gradle Wrapper, game artwork, and trademarks retain
+their own rights and are not relicensed here. See THIRD_PARTY_NOTICES.md
+and CREDITS.md. The game artwork is excluded from the GPL grant.
+
+Code changes and this README were prepared with OpenAI Codex (GPT-6 Astra).
