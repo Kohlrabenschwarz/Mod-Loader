@@ -2,7 +2,7 @@ name: Import release source
 
 on:
   release:
-    types: [published]
+    types: [edited]
 
 permissions:
   contents: write
@@ -12,7 +12,7 @@ jobs:
     if: github.event.release.tag_name == 'v1.0.0'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the release commit
+      - name: Check out the main branch
         uses: actions/checkout@v4
         with:
           ref: main
@@ -62,11 +62,9 @@ jobs:
           git commit -m "build: add CI, wrapper, examples, and release guidance" \
             -m "Adds reproducible Gradle wrapper files, dependency automation, CI checks, the safe UnityFS template, third-party license inventory, and the v1.0.0 release guide. Removes the one-time source importer."
 
-      - name: Verify the imported tree and publish it
+      - name: Verify and publish the imported tree
         shell: bash
         run: |
           set -euo pipefail
-          diff -qr --exclude=.git "$SOURCE_DIR" "$GITHUB_WORKSPACE"
+          diff -qr --strip-trailing-cr --exclude=.git "$SOURCE_DIR" "$GITHUB_WORKSPACE"
           git push origin HEAD:main
-          git tag -f v1.0.0
-          git push --force origin refs/tags/v1.0.0
