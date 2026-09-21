@@ -1,37 +1,59 @@
-# Building and publishing a release
+# Releasing Mod Loader
 
-The public APK is a minified, non-debuggable `release` build signed with a dedicated maintainer key. The private key is not committed or uploaded. Keep an encrypted offline backup of your own signing key and its passwords; Android updates require the same signing identity.
+This guide is for maintainers preparing an official GitHub release. The public APK must come from the exact source commit that receives the release tag, and every Android update must be signed by the same maintainer key.
 
-## Build locally
+## Protect the signing identity
 
-Set these environment variables for the Gradle process:
+The private PKCS12/JKS file and its passwords must remain outside this repository and outside GitHub. Keep an encrypted offline backup: losing the key means existing installations cannot receive a normal in-place update.
 
-- `MODLOADER_KEYSTORE`: absolute path to your private PKCS12/JKS keystore.
-- `MODLOADER_STORE_PASSWORD`: keystore password.
-- `MODLOADER_KEY_ALIAS`: signing key alias.
-- `MODLOADER_KEY_PASSWORD`: key password.
+The build reads signing details only from the current process environment:
 
-Then run:
+- `MODLOADER_KEYSTORE` — absolute path to the PKCS12/JKS file
+- `MODLOADER_STORE_PASSWORD` — keystore password
+- `MODLOADER_KEY_ALIAS` — signing alias
+- `MODLOADER_KEY_PASSWORD` — key password
+
+Do not put these values in Gradle files, scripts, release notes, GitHub Actions variables, or committed property files.
+
+## Prepare the version
+
+1. Set `versionName` and increase `versionCode` in `app/build.gradle.kts`.
+2. Keep the Shizuku user-service version in step with implementation changes that require service recreation.
+3. Update README version references, `VALIDATION.md`, credits, third-party notices, and release notes.
+4. Confirm that localized UI resources have matching keys and localized agreements have the same structure as the English source.
+5. Confirm that the Git worktree contains no secret, private payload, or machine-specific file.
+
+## Build and verify
+
+With the four signing variables set, run:
 
 ```sh
-./gradlew :domain:test :app:lintDebug :app:assembleRelease :engine:assembleDebugAndroidTest
+./gradlew test :app:lintDebug :app:assembleRelease :engine:assembleDebugAndroidTest
 ```
 
-The signed result is `app/build/outputs/apk/release/app-release.apk`. Without the signing variables, the release variant builds an unsigned APK for local inspection; do not upload that unsigned file as an installable release. Never place credentials in Gradle scripts or commit a properties file containing them.
+The signed APK is written to `app/build/outputs/apk/release/app-release.apk`. If signing variables are absent, Gradle may produce an unsigned release for inspection. Never publish that file as the official APK.
 
-Verify with the Android SDK's `apksigner verify --verbose --print-certs` and `zipalign -c -P 16 4`. Inspect the manifest version and verify `android:debuggable` is not enabled. Generate a SHA-256 checksum for the final signed APK, not its unsigned predecessor. Record the signing certificate fingerprint in the release notes.
+Before publishing, verify the APK with `apksigner`, check alignment with `zipalign`, inspect the packaged version and debuggable state, and calculate SHA-256 from the final signed bytes. When a test device is available, install the exact APK and exercise agreement display, language switching, import, activation, deactivation, SHA warnings, recovery, update discovery, and Shizuku disconnects. Record anything that could not be tested.
 
-## Publish
+## Assemble the GitHub release
 
-1. Update the app version code/name and Shizuku user-service version if its implementation changes.
-2. Refresh credits, dependency notices, validation results, and release notes in English.
-3. Run the checks above. Where available, install on an isolated device and test import, activation, deactivation, recovery, and Shizuku disconnects. State clearly when device testing was not performed.
-4. Commit source with short messages explaining each coherent change. Tag the exact committed source.
-5. Attach the signed release APK, SHA-256 checksum file, generic template, and `THIRD_PARTY_NOTICES.md` to the GitHub release. GitHub supplies source archives for the tag.
-6. Publish without any signing keys, passwords, machine-specific files, caches, or user-supplied real mod archives.
+Use a stable tag in the form `vMAJOR.MINOR.PATCH`. The update checker expects the APK asset to be named exactly:
 
-Version 0.9.0 changes the application ID to `dev.kohlrabenschwarz.ml`. Earlier `dev.modloader.app` installations are separate applications, not in-place upgrade candidates. Preserve imports and complete/deactivate operations before switching loaders. The release is signed with the maintainer-provided Kohlrabenschwarz key; future releases must reuse that key and increase versionCode.
+```text
+Mod-Loader-vMAJOR.MINOR.PATCH-release.apk
+```
 
-## Update discovery contract
+Attach the signed APK, its `.sha256` file, `generic-mod-template.zip`, and `THIRD_PARTY_NOTICES.md`. Paste the matching note from `docs/releases/` into the GitHub Release description. GitHub automatically supplies source archives for the tag. Mark the release as latest and stable; drafts and prereleases are intentionally ignored by installed clients.
 
-Publish a stable GitHub Release with a canonical `vMAJOR.MINOR.PATCH` tag and a signed `Mod-Loader-vMAJOR.MINOR.PATCH-release.apk` asset. Mark that release latest. Drafts and prereleases are ignored. A git push alone does not notify installed clients; the published release is required. The app compares stable versions numerically, and Android checks the installed APK signature and version code during installation.
+## Publication order
+
+1. Finish and review the source.
+2. Run validation.
+3. Commit coherent changes with short explanatory messages.
+4. Push the source commits.
+5. Tag the exact release commit and push the tag.
+6. Create the GitHub Release and upload the verified assets.
+7. Compare the uploaded APK checksum with the local checksum.
+8. Confirm that the in-app update checker sees the published release.
+
+Version 1.0.0 uses application ID `dev.kohlrabenschwarz.ml`, version code 14, and the Kohlrabenschwarz signing certificate. Releases before 0.9.0 used a different application ID and cannot update in place.

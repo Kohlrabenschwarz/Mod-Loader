@@ -1,8 +1,12 @@
 # Credits
 
+Mod Loader exists because it builds on years of open-source Android work. This page records the people and projects that made the application possible and explains which visual material is not covered by the project’s GPL license.
+
 ## Project
 
 Maintained by [Kohlrabenschwarz](https://github.com/Kohlrabenschwarz).
+
+Thank you to everyone who reports problems, tests recovery behavior, improves translations, or contributes code and documentation.
 
 **Code changes and this README were prepared with OpenAI Codex (GPT-6 Astra).**
 
@@ -23,4 +27,4 @@ The launcher image was supplied by the maintainer. According to the maintainer, 
 
 `app/src/main/res/drawable-nodpi/mod_loader_art.png` is excluded from the project's GPLv3 code license. Attribution is not a sublicense or proof of a redistribution grant. No independent permission to reuse the underlying game artwork or trademarks is granted by this repository. This is an unofficial community tool and is not affiliated with or endorsed by the game's creators.
 
-The generic template contains project-generated dummy payloads and a simple template icon, not game assets. User-supplied real mod packages and proprietary game bundles are not included.
+The generic template contains project-generated `UnityFS`-header dummy fixtures and a simple template icon, not game assets. User-supplied real mod packages and proprietary game bundles are not included.
