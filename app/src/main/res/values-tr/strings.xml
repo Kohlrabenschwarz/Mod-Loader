@@ -57,6 +57,7 @@
     <string name="error_conflict">Başka bir aktif mod aynı dosyaları etkiliyor. Önce çakışan modu deaktif yapın.</string>
     <string name="error_limit">Boyut sınırı aşıldı: ZIP 256 MiB, tek dosya 256 MiB, toplam payload 512 MiB, ikon 4 MiB / 2048 px.</string>
     <string name="error_game">Oyun açılamadı veya durdurulamadı. Oyun kurulumunu ve Shizuku bağlantısını kontrol edin.</string>
+    <string name="error_bundle_header">Payload içindeki bir dosya UnityFS bundle değil. Uzantı gerekmeksizin her payload dosyası UnityFS başlığıyla başlamalıdır.</string>
     <string name="recover_base">Temel dosyaları geri yükle</string>
     <string name="ignore_warning">Bu uyarıyı yoksay</string>
     <string name="ignore_prompt">Uygulamaya tekrar döndüğünüzde bu uyarı gösterilsin mi? Gizlemek bütünlük kontrollerini kapatmaz. Karta basılı tutarak uyarıyı yeniden açabilirsiniz.</string>
@@ -80,4 +81,13 @@
     <string name="update_available">%1$s sürümü hazır</string>
     <string name="update_install_hint">İndirme tarayıcıda açılır. APK dosyasını açıp Android kurulumunu onaylayın.</string>
     <string name="game_data_missing">Oyun verileri bulunamadı. Shadow Fight Arena oyununu kurun, açın ve veri indirmesini tamamlayın.</string>
+    <string name="activate_confirm_title">Bu mod etkinleştirilsin mi?</string>
+    <string name="activate_confirm_body">Mod dosyaları güvenilmeyen oyun verileridir. Uyumsuz olabilir, oyun verisini bozabilir veya oyunun dosya ayrıştırıcısındaki bir açığı tetikleyebilir. Hedef dosyaları inceleyin ve yalnızca kaynağa güveniyorsanız devam edin. Orijinal dosyalar yedeklenecektir.</string>
+    <string name="unverified_metadata">Gösterilen ad ve üretici mod yazarı tarafından bildirilmiştir; doğrulanmış değildir.</string>
+    <string name="activate_anyway">Modu etkinleştir</string>
+    <string name="agreement_title">Kullanıcı sözleşmesi ve risk bildirimi</string>
+    <string name="agreement_accept_checkbox">Bu bildirimi okudum, riskleri anladım ve seçtiğim dosya ve işlemlerin sorumluluğunu kabul ediyorum.</string>
+    <string name="agreement_accept">Kabul et ve devam et</string>
+    <string name="agreement_decline">Reddet ve çık</string>
+    <string name="agreement_review">Kullanıcı sözleşmesi ve risk bildirimi</string>
 </resources>

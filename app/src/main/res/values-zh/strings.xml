@@ -57,6 +57,7 @@
     <string name="error_conflict">另一个已启用模组影响相同文件。请先停用冲突的模组。</string>
     <string name="error_limit">超出大小限制：ZIP 256 MiB，单文件 256 MiB，总文件 512 MiB，图标 4 MiB / 2048 px。</string>
     <string name="error_game">无法打开或停止游戏。请检查游戏安装和 Shizuku 连接。</string>
+    <string name="error_bundle_header">载荷中有文件不是 UnityFS 包。文件无需扩展名，但每个载荷文件都必须以 UnityFS 文件头开头。</string>
     <string name="recover_base">恢复基础文件</string>
     <string name="ignore_warning">忽略此警告</string>
     <string name="ignore_prompt">下次返回应用时再次显示此警告吗？隐藏警告不会关闭完整性检查。长按模组卡片可重新打开警告。</string>
@@ -80,4 +81,13 @@
     <string name="update_available">版本 %1$s 已发布</string>
     <string name="update_install_hint">将在浏览器中下载。打开 APK 文件并在 Android 中确认安装。</string>
     <string name="game_data_missing">未找到游戏数据。请安装并打开 Shadow Fight Arena，然后完成数据下载。</string>
+    <string name="activate_confirm_title">要启用此模组吗？</string>
+    <string name="activate_confirm_body">模组文件是不受信任的游戏数据，可能不兼容、损坏游戏数据，或利用游戏文件解析器中的漏洞。请检查目标文件，并仅在信任来源时继续。原始文件将被备份。</string>
+    <string name="unverified_metadata">显示的名称和作者由模组制作者自行声明，未经验证。</string>
+    <string name="activate_anyway">启用模组</string>
+    <string name="agreement_title">用户协议与风险提示</string>
+    <string name="agreement_accept_checkbox">我已阅读本提示，理解相关风险，并对自己选择的文件和操作承担责任。</string>
+    <string name="agreement_accept">接受并继续</string>
+    <string name="agreement_decline">拒绝并退出</string>
+    <string name="agreement_review">用户协议与风险提示</string>
 </resources>

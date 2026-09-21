@@ -26,7 +26,11 @@ class MainActivity : ComponentActivity() {
                     else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
                 enableEdgeToEdge(statusBarStyle = bar, navigationBarStyle = bar)
             }
-            LoaderTheme(ui.dark, ui.accent) { LoaderRoute(vm) }
+            LoaderTheme(ui.dark, ui.accent) {
+                if (ui.agreementAccepted) LoaderRoute(vm)
+                else UserAgreementDialog(ui.language, required = true, onLanguage = vm::language, onAccept = vm::acceptAgreement,
+                    onDismiss = { finishAffinity() })
+            }
         }
     }
 }

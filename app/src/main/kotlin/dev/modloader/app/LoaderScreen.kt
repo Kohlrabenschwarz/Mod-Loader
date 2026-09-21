@@ -34,6 +34,7 @@ fun LoaderScreen(ui: LoaderUi, status: ShizukuStatus, attempt: Int,
     onWarningAction: (String, Boolean) -> Unit = { _, _ -> }, onIgnore: (String, Boolean) -> Unit = { _, _ -> }) {
     val text = uiText(ui.language)
     var settings by remember { mutableStateOf(false) }
+    var agreementOpen by remember { mutableStateOf(false) }
     val connected = status == ShizukuStatus.READY
     val ready = connected && !ui.busy
     val statusLabel = text.get(when (status) {
@@ -131,7 +132,11 @@ fun LoaderScreen(ui: LoaderUi, status: ShizukuStatus, attempt: Int,
         }
     }
     if (settings) AlertDialog(onDismissRequest = { settings = false }, title = { Text(text.get(R.string.settings)) },
-        text = { SettingsPanel(ui, onLanguage, onDark, onAccent, onCheckUpdates, onUpdate) }, confirmButton = { TextButton(onClick = { settings = false }) { Text(text.get(R.string.done)) } })
+        text = { SettingsPanel(ui, onLanguage, onDark, onAccent, onCheckUpdates, onUpdate,
+            onAgreement = { settings = false; agreementOpen = true }) },
+        confirmButton = { TextButton(onClick = { settings = false }) { Text(text.get(R.string.done)) } })
+    if (agreementOpen) UserAgreementDialog(ui.language, required = false, onLanguage = onLanguage,
+        onDismiss = { agreementOpen = false })
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -143,6 +148,7 @@ private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnab
     var menuOpen by remember(mod.id) { mutableStateOf(false) }
     var warningOpen by remember(mod.id) { mutableStateOf(false) }
     var warningChoice by remember(mod.id) { mutableStateOf<String?>(null) }
+    var activationPending by remember(mod.id) { mutableStateOf(false) }
     OutlinedCard(Modifier.fillMaxWidth().combinedClickable(enabled = menuEnabled,
         onClick = { expanded = !expanded }, onLongClick = { menuOpen = true }, onLongClickLabel = text.get(R.string.mod_options))) {
         Column(Modifier.padding(14.dp)) {
@@ -174,7 +180,9 @@ private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnab
                         color = if (mod.active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(text.get(R.string.files_details, mod.metadata.affectedFiles.size), style = MaterialTheme.typography.bodySmall)
                 }
-                Switch(checked = mod.active, onCheckedChange = onToggle, enabled = enabled && mod.issue == null && !mod.shaMismatch,
+                Switch(checked = mod.active, onCheckedChange = { active ->
+                    if (active) activationPending = true else onToggle(false)
+                }, enabled = enabled && mod.issue == null && !mod.shaMismatch,
                     modifier = Modifier.semantics { contentDescription = text.get(R.string.activate_mod, mod.metadata.name) })
             }
             if (!mod.archived) Text(text.get(R.string.waiting_archive), style = MaterialTheme.typography.bodySmall)
@@ -192,6 +200,24 @@ private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnab
             }
         }
     }
+    if (activationPending) AlertDialog(
+        onDismissRequest = { activationPending = false },
+        title = { Text(text.get(R.string.activate_confirm_title)) },
+        text = {
+            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text.get(R.string.activate_confirm_body))
+                Text(text.get(R.string.unverified_metadata), style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error)
+                Text(text.get(R.string.affected_files), style = MaterialTheme.typography.labelLarge)
+                mod.metadata.affectedFiles.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+            }
+        },
+        confirmButton = { TextButton(enabled = enabled, onClick = { activationPending = false; onToggle(true) }) {
+            Text(text.get(R.string.activate_anyway))
+        } },
+        dismissButton = { TextButton(onClick = { activationPending = false }) { Text(text.get(R.string.cancel_action)) } }
+    )
     if (warningOpen) AlertDialog(onDismissRequest = { warningOpen = false },
         title = { Text(text.get(R.string.sha_title)) }, text = { Text(text.get(R.string.sha_body)) },
         confirmButton = { Column(horizontalAlignment = Alignment.End) {
@@ -227,13 +253,15 @@ private fun errorText(code: Int): Int = when (code) {
     10 -> R.string.error_game
     11 -> R.string.no_base_backup
     12 -> R.string.game_data_missing
+    13 -> R.string.error_bundle_header
     else -> R.string.operation_error
 }
 
 /** Shizuku veya ViewModel oluşturmaz; Preview ve gerçek diyalog aynı UI'ı kullanır. */
 @Composable
 fun SettingsPanel(ui: LoaderUi, onLanguage: (String) -> Unit = {}, onDark: (Boolean) -> Unit = {},
-    onAccent: (Accent) -> Unit = {}, onCheckUpdates: () -> Unit = {}, onUpdate: () -> Unit = {}) {
+    onAccent: (Accent) -> Unit = {}, onCheckUpdates: () -> Unit = {}, onUpdate: () -> Unit = {},
+    onAgreement: () -> Unit = {}) {
     val text = uiText(ui.language)
     Column(Modifier.verticalScroll(rememberScrollState())) {
             Text(text.get(R.string.app_updates), style = MaterialTheme.typography.titleMedium)
@@ -247,6 +275,7 @@ fun SettingsPanel(ui: LoaderUi, onLanguage: (String) -> Unit = {}, onDark: (Bool
             Text(text.get(updateLabel), style = MaterialTheme.typography.bodySmall)
             TextButton(enabled = ui.updateStatus != UpdateStatus.CHECKING, onClick = onCheckUpdates) { Text(text.get(R.string.check_updates)) }
             if (ui.updateVersion != null) TextButton(enabled = !ui.busy, onClick = onUpdate) { Text(text.get(R.string.download_update)) }
+            TextButton(onClick = onAgreement) { Text(text.get(R.string.agreement_review)) }
             HorizontalDivider()
 
             Text(text.get(R.string.app_language), style = MaterialTheme.typography.titleMedium)

@@ -57,6 +57,7 @@
     <string name="error_conflict">Another active mod affects the same files. Disable the conflicting mod first.</string>
     <string name="error_limit">A size limit was exceeded: ZIP 256 MiB, one file 256 MiB, total payload 512 MiB, icon 4 MiB / 2048 px.</string>
     <string name="error_game">The game could not be opened or stopped. Check its installation and the Shizuku connection.</string>
+    <string name="error_bundle_header">A payload file is not a UnityFS bundle. Every payload file must begin with the UnityFS header; file extensions are not required.</string>
     <string name="recover_base">Recover base files</string>
     <string name="ignore_warning">Ignore this warning</string>
     <string name="ignore_prompt">Show this warning again the next time you return to the app? Hiding it does not disable integrity checks. You can reopen it by holding the mod card.</string>
@@ -80,4 +81,13 @@
     <string name="update_available">Version %1$s is available</string>
     <string name="update_install_hint">Download opens in your browser. Open the APK and confirm installation in Android.</string>
     <string name="game_data_missing">Game data was not found. Install Shadow Fight Arena, open it, and finish downloading its data.</string>
+    <string name="activate_confirm_title">Activate this mod?</string>
+    <string name="activate_confirm_body">Mod files are untrusted game data. They can be incompatible, corrupt game data, or exploit a bug in the game’s file parser. Review the target files and continue only if you trust the source. Original files will be backed up.</string>
+    <string name="unverified_metadata">The displayed name and creator are self-declared and are not verified.</string>
+    <string name="activate_anyway">Activate mod</string>
+    <string name="agreement_title">User agreement and risk notice</string>
+    <string name="agreement_accept_checkbox">I have read this notice, understand the risks, and accept responsibility for the files and actions I choose.</string>
+    <string name="agreement_accept">Accept and continue</string>
+    <string name="agreement_decline">Decline and exit</string>
+    <string name="agreement_review">User agreement and risk notice</string>
 </resources>

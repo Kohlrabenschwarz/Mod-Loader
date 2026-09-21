@@ -57,6 +57,7 @@
     <string name="error_conflict">Другой активный мод затрагивает те же файлы. Сначала отключите конфликтующий мод.</string>
     <string name="error_limit">Превышен лимит: ZIP 256 MiB, файл 256 MiB, все файлы 512 MiB, значок 4 MiB / 2048 px.</string>
     <string name="error_game">Не удалось открыть или остановить игру. Проверьте установку и подключение Shizuku.</string>
+    <string name="error_bundle_header">Один из файлов мода не является пакетом UnityFS. Расширение не требуется, но каждый файл мода должен начинаться с заголовка UnityFS.</string>
     <string name="recover_base">Восстановить базовые файлы</string>
     <string name="ignore_warning">Игнорировать предупреждение</string>
     <string name="ignore_prompt">Показать предупреждение при следующем возвращении в приложение? Проверки целостности останутся включены. Предупреждение можно открыть долгим нажатием на карточку мода.</string>
@@ -80,4 +81,13 @@
     <string name="update_available">Доступна версия %1$s</string>
     <string name="update_install_hint">Загрузка откроется в браузере. Откройте APK и подтвердите установку в Android.</string>
     <string name="game_data_missing">Данные игры не найдены. Установите Shadow Fight Arena, откройте игру и завершите загрузку данных.</string>
+    <string name="activate_confirm_title">Активировать этот мод?</string>
+    <string name="activate_confirm_body">Файлы мода — недоверенные игровые данные. Они могут быть несовместимы, повредить данные игры или использовать ошибку обработчика файлов игры. Проверьте целевые файлы и продолжайте, только если доверяете источнику. Исходные файлы будут сохранены.</string>
+    <string name="unverified_metadata">Указанные имя и автор заявлены создателем мода и не проверены.</string>
+    <string name="activate_anyway">Активировать мод</string>
+    <string name="agreement_title">Пользовательское соглашение и уведомление о рисках</string>
+    <string name="agreement_accept_checkbox">Я прочитал(а) уведомление, понимаю риски и принимаю ответственность за выбранные файлы и действия.</string>
+    <string name="agreement_accept">Принять и продолжить</string>
+    <string name="agreement_decline">Отклонить и выйти</string>
+    <string name="agreement_review">Пользовательское соглашение и уведомление о рисках</string>
 </resources>

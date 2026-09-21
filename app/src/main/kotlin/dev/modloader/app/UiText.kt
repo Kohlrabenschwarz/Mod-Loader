@@ -14,7 +14,9 @@ enum class AppLanguage(val code: String, val nativeName: String) {
     CHINESE("zh", "简体中文"), RUSSIAN("ru", "Русский"), GERMAN("de", "Deutsch");
 
     companion object {
+        const val DEFAULT_CODE = "en"
         fun supported(code: String) = entries.any { it.code == code }
+        fun normalize(code: String?): String = code?.takeIf(::supported) ?: DEFAULT_CODE
     }
 }
 
@@ -29,7 +31,7 @@ fun uiText(language: String): UiText {
     val configuration = LocalConfiguration.current
     return remember(context, configuration, language) {
         val config = Configuration(configuration).apply {
-            setLocale(Locale.forLanguageTag(if (AppLanguage.supported(language)) language else "tr"))
+            setLocale(Locale.forLanguageTag(AppLanguage.normalize(language)))
         }
         UiText(context.createConfigurationContext(config).resources)
     }

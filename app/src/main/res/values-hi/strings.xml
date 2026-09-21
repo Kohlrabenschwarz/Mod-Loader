@@ -57,6 +57,7 @@
     <string name="error_conflict">दूसरा सक्रिय मॉड उन्हीं फ़ाइलों को बदलता है। पहले उसे निष्क्रिय करें।</string>
     <string name="error_limit">आकार सीमा पार हुई: ZIP 256 MiB, एक फ़ाइल 256 MiB, कुल डेटा 512 MiB, आइकन 4 MiB / 2048 px।</string>
     <string name="error_game">गेम खोला या रोका नहीं जा सका। गेम की स्थापना और Shizuku कनेक्शन जाँचें।</string>
+    <string name="error_bundle_header">पेलोड की एक फ़ाइल UnityFS बंडल नहीं है। एक्सटेंशन आवश्यक नहीं है, लेकिन हर पेलोड फ़ाइल UnityFS हेडर से शुरू होनी चाहिए।</string>
     <string name="recover_base">मूल फ़ाइलें बहाल करें</string>
     <string name="ignore_warning">यह चेतावनी अनदेखी करें</string>
     <string name="ignore_prompt">अगली बार ऐप पर लौटने पर यह चेतावनी फिर दिखाएँ? इसे छिपाने से अखंडता जाँच बंद नहीं होगी। मॉड कार्ड को दबाकर रखने पर चेतावनी फिर खोल सकते हैं।</string>
@@ -80,4 +81,13 @@
     <string name="update_available">संस्करण %1$s उपलब्ध है</string>
     <string name="update_install_hint">डाउनलोड ब्राउज़र में खुलेगा। APK खोलें और Android में इंस्टॉल करने की पुष्टि करें।</string>
     <string name="game_data_missing">गेम डेटा नहीं मिला। Shadow Fight Arena इंस्टॉल करें, खोलें और उसका डेटा डाउनलोड पूरा करें।</string>
+    <string name="activate_confirm_title">क्या यह मॉड सक्रिय करें?</string>
+    <string name="activate_confirm_body">मॉड फ़ाइलें अविश्वसनीय गेम डेटा हैं। वे असंगत हो सकती हैं, गेम डेटा खराब कर सकती हैं या गेम के फ़ाइल पार्सर की कमी का दुरुपयोग कर सकती हैं। लक्ष्य फ़ाइलें जाँचें और केवल विश्वसनीय स्रोत होने पर जारी रखें। मूल फ़ाइलों का बैकअप बनेगा।</string>
+    <string name="unverified_metadata">दिखाया गया नाम और निर्माता स्वयं घोषित हैं और सत्यापित नहीं हैं।</string>
+    <string name="activate_anyway">मॉड सक्रिय करें</string>
+    <string name="agreement_title">उपयोगकर्ता समझौता और जोखिम सूचना</string>
+    <string name="agreement_accept_checkbox">मैंने यह सूचना पढ़ी है, जोखिम समझता/समझती हूँ और चुनी गई फ़ाइलों तथा कार्रवाइयों की जिम्मेदारी स्वीकार करता/करती हूँ।</string>
+    <string name="agreement_accept">स्वीकार करें और जारी रखें</string>
+    <string name="agreement_decline">अस्वीकार कर बाहर निकलें</string>
+    <string name="agreement_review">उपयोगकर्ता समझौता और जोखिम सूचना</string>
 </resources>

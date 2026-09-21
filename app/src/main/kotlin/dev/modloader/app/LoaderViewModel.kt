@@ -15,29 +15,45 @@ data class LoaderUi(val mods: List<LibraryMod> = emptyList(), val busy: Boolean 
     val progress: Progress? = null, val notice: Notice = Notice.READY, val errorCode: Int = 4,
     val updateStatus: UpdateStatus = UpdateStatus.IDLE, val updateVersion: String? = null,
     val appName: String = "Mod Loader", val appVersion: String = "", val appSha: String? = null, val shaFailed: Boolean = false,
-    val language: String = "tr", val dark: Boolean = false, val accent: Accent = Accent.PURPLE)
+    val language: String = AppLanguage.DEFAULT_CODE, val dark: Boolean = false, val accent: Accent = Accent.PURPLE,
+    val agreementAccepted: Boolean = false)
 
 class LoaderViewModel(application: Application) : AndroidViewModel(application) {
-    val shizuku = ShizukuManager(application)
-    private val repository: ModRepository = ShizukuModRepository(shizuku)
-    private val library = ModLibrary(application)
-    private val prefs = application.getSharedPreferences("recovery", 0)
-    private val mutableUi = MutableStateFlow(LoaderUi(language = prefs.getString("language", "tr")?.takeIf(AppLanguage::supported) ?: "tr",
-        dark = prefs.getBoolean("dark", false), accent = Accent.entries.firstOrNull { it.name == prefs.getString("accent", "PURPLE") } ?: Accent.PURPLE))
+    private val app = application
+    private val shizukuDelegate = lazy(LazyThreadSafetyMode.NONE) { ShizukuManager(app) }
+    val shizuku: ShizukuManager by shizukuDelegate
+    private val repository: ModRepository by lazy(LazyThreadSafetyMode.NONE) { ShizukuModRepository(shizuku) }
+    private val library = ModLibrary(app)
+    private val prefs = app.getSharedPreferences("recovery", 0)
+    private val mutableUi = MutableStateFlow(LoaderUi(language = AppLanguage.normalize(prefs.getString("language", null)),
+        dark = prefs.getBoolean("dark", false), accent = Accent.entries.firstOrNull { it.name == prefs.getString("accent", "PURPLE") } ?: Accent.PURPLE,
+        agreementAccepted = UserAgreementPolicy.isAccepted(prefs.getInt("agreementVersion", 0))))
     val ui = mutableUi.asStateFlow()
     private var syncPending = false
 
     private var availableUpdate: AppUpdate? = null
     private var lastUpdateAttempt = -60_000L
     private val sessionIgnored = mutableSetOf<String>()
+    private var started = false
     init {
+        if (mutableUi.value.agreementAccepted) startAfterAgreement()
+    }
+    fun acceptAgreement() {
+        check(prefs.edit().putInt("agreementVersion", UserAgreementPolicy.VERSION)
+            .putLong("agreementAcceptedAt", System.currentTimeMillis()).commit())
+        mutableUi.update { it.copy(agreementAccepted = true) }
+        startAfterAgreement()
+    }
+    private fun startAfterAgreement() {
+        if (started) return
+        started = true
         viewModelScope.launch {
             val info = withContext(Dispatchers.IO) {
-                val label = application.applicationInfo.loadLabel(application.packageManager).toString()
-                val version = application.packageManager.getPackageInfo(application.packageName, 0).versionName.orEmpty()
+                val label = app.applicationInfo.loadLabel(app.packageManager).toString()
+                val version = app.packageManager.getPackageInfo(app.packageName, 0).versionName.orEmpty()
                 val hash = try {
                     val digest = java.security.MessageDigest.getInstance("SHA-256")
-                    java.io.File(application.applicationInfo.sourceDir).inputStream().use { input ->
+                    java.io.File(app.applicationInfo.sourceDir).inputStream().use { input ->
                         val buffer = ByteArray(64 * 1024)
                         while (true) { val n = input.read(buffer); if (n < 0) break; digest.update(buffer, 0, n) }
                     }
@@ -275,5 +291,5 @@ class LoaderViewModel(application: Application) : AndroidViewModel(application) 
         mutableUi.update { it.copy(mods = it.mods.filterNot { mod -> mod.id == id }, notice = Notice.DELETED) }
         if (shizuku.status.value == ShizukuStatus.READY) publish(repository.managedMods())
     }
-    override fun onCleared() { shizuku.close() }
+    override fun onCleared() { if (shizukuDelegate.isInitialized()) shizuku.close() }
 }

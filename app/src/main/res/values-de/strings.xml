@@ -57,6 +57,7 @@
     <string name="error_conflict">Ein anderer aktiver Mod betrifft dieselben Dateien. Deaktiviere zuerst den widersprüchlichen Mod.</string>
     <string name="error_limit">Größenlimit überschritten: ZIP 256 MiB, einzelne Datei 256 MiB, Nutzdaten insgesamt 512 MiB, Symbol 4 MiB / 2048 px.</string>
     <string name="error_game">Das Spiel konnte nicht geöffnet oder beendet werden. Prüfe Installation und Shizuku-Verbindung.</string>
+    <string name="error_bundle_header">Eine Nutzdatendatei ist kein UnityFS-Bundle. Jede Nutzdatendatei muss mit dem UnityFS-Header beginnen; Dateiendungen sind nicht erforderlich.</string>
     <string name="recover_base">Basisdateien wiederherstellen</string>
     <string name="ignore_warning">Warnung ignorieren</string>
     <string name="ignore_prompt">Diese Warnung bei der nächsten Rückkehr zur App erneut anzeigen? Integritätsprüfungen bleiben aktiv. Durch langes Drücken der Mod-Karte lässt sich die Warnung wieder öffnen.</string>
@@ -80,4 +81,13 @@
     <string name="update_available">Version %1$s ist verfügbar</string>
     <string name="update_install_hint">Der Download öffnet sich im Browser. Öffne die APK und bestätige die Installation in Android.</string>
     <string name="game_data_missing">Spieldaten wurden nicht gefunden. Installiere Shadow Fight Arena, öffne es und schließe den Datendownload ab.</string>
+    <string name="activate_confirm_title">Diesen Mod aktivieren?</string>
+    <string name="activate_confirm_body">Mod-Dateien sind nicht vertrauenswürdige Spieldaten. Sie können inkompatibel sein, Spieldaten beschädigen oder einen Fehler im Datei-Parser des Spiels ausnutzen. Prüfe die Zieldateien und fahre nur fort, wenn du der Quelle vertraust. Originaldateien werden gesichert.</string>
+    <string name="unverified_metadata">Der angezeigte Name und Ersteller sind Selbstauskünfte und nicht verifiziert.</string>
+    <string name="activate_anyway">Mod aktivieren</string>
+    <string name="agreement_title">Nutzungsvereinbarung und Risikohinweis</string>
+    <string name="agreement_accept_checkbox">Ich habe diesen Hinweis gelesen, verstehe die Risiken und übernehme die Verantwortung für meine ausgewählten Dateien und Aktionen.</string>
+    <string name="agreement_accept">Akzeptieren und fortfahren</string>
+    <string name="agreement_decline">Ablehnen und beenden</string>
+    <string name="agreement_review">Nutzungsvereinbarung und Risikohinweis</string>
 </resources>
