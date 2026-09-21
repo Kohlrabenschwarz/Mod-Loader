@@ -1,6 +1,7 @@
 package dev.modloader.domain
 
 import kotlinx.coroutines.flow.Flow
+import java.text.Normalizer
 
 object GameTarget {
     const val PACKAGE_NAME = "com.nekki.shadowfightarena"
@@ -47,6 +48,18 @@ object Limits {
     const val RESERVE_BYTES = 32L * 1024 * 1024
 }
 
+/** Extensionless game files are accepted only when they identify as a UnityFS AssetBundle. */
+object UnityBundlePolicy {
+    const val HEADER = "UnityFS"
+    const val HEADER_SIZE = 7
+
+    fun requireHeader(prefix: ByteArray) {
+        if (prefix.size != HEADER_SIZE || !prefix.contentEquals(HEADER.toByteArray(Charsets.US_ASCII))) {
+            throw EngineFailure(13, "INVALID_UNITYFS_HEADER")
+        }
+    }
+}
+
 object PathPolicy {
     fun packageName(value: String): String {
         require(value == GameTarget.PACKAGE_NAME) { "Yalnızca Shadow Fight Arena desteklenir" }
@@ -56,10 +69,15 @@ object PathPolicy {
 
     fun relative(raw: String, pkg: String): String {
         packageName(pkg)
-        require(raw.length in 1..240 && raw.none { it.code < 32 || it == '\\' || it == ':' }) { "Geçersiz ZIP yolu" }
+        require(raw.length in 1..240 && raw == Normalizer.normalize(raw, Normalizer.Form.NFKC)) { "Geçersiz ZIP yolu" }
+        require(raw.none { it.code < 32 || it.code == 127 || it == '\\' || it == ':' || Character.getType(it) == Character.FORMAT.toInt() }) {
+            "Geçersiz ZIP yolu"
+        }
+        require(raw.none { it in setOf('\u2044', '\u2215', '\u29F5', '\uFF0F', '\uFF3C') }) { "Belirsiz yol ayırıcı reddedildi" }
         require(!raw.startsWith('/')) { "Mutlak yol reddedildi" }
         val parts = raw.removeSuffix("/").split('/')
         require(parts.none { it.isEmpty() || it == "." || it == ".." }) { "Yol geçişi reddedildi" }
+        require(parts.all { it.toByteArray(Charsets.UTF_8).size <= 255 }) { "ZIP yol bileşeni çok uzun" }
         val normalized = when {
             raw.startsWith("Android/data/$pkg/") -> raw.removePrefix("Android/data/$pkg/")
             raw.startsWith("$pkg/") -> raw.removePrefix("$pkg/")
@@ -69,10 +87,28 @@ object PathPolicy {
             else -> raw
         }.removeSuffix("/")
         require(normalized == GameTarget.RELATIVE_RESOURCES || normalized.startsWith(GameTarget.RELATIVE_RESOURCES + "/")) { "Yalnızca gamedata/Resources/Bundles/ ağacı desteklenir" }
-        require(normalized.removePrefix(GameTarget.RELATIVE_RESOURCES + "/").substringBefore('/').lowercase(java.util.Locale.ROOT) != "mods") {
+        val targetParts = normalized.removePrefix(GameTarget.RELATIVE_RESOURCES).trimStart('/').split('/').filter(String::isNotEmpty)
+        require(targetParts.none { it.startsWith('.') }) { "Gizli veya ayrılmış hedef adı reddedildi" }
+        require(targetParts.firstOrNull()?.lowercase(java.util.Locale.ROOT) != "mods") {
             "mods/ uygulamanın arşiv ve yedek alanıdır; mod payload hedefi olamaz"
         }
         return normalized
+    }
+}
+
+/** ZIP üreticisinin kontrol ettiği metinlerin arayüz yönünü veya satır düzenini taklit etmesini engeller. */
+object UntrustedTextPolicy {
+    fun display(raw: String, max: Int, multiline: Boolean = false): String {
+        require(raw == Normalizer.normalize(raw, Normalizer.Form.NFKC)) { "Metin Unicode NFKC biçiminde olmalı" }
+        val value = raw.trim()
+        require(value.isNotBlank() && value.length <= max) { "Geçersiz metin uzunluğu" }
+        require(value.none { character ->
+            Character.getType(character) == Character.FORMAT.toInt() ||
+                (Character.isISOControl(character) && !(multiline && character == '\n'))
+        }) { "Kontrol veya yönlendirme karakteri reddedildi" }
+        if (!multiline) require('\n' !in value && '\r' !in value) { "Tek satırlı metin gerekli" }
+        if (multiline) require(value.count { it == '\n' } <= 20) { "Çok fazla metin satırı" }
+        return value
     }
 }
 

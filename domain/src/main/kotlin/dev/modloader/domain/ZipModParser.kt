@@ -59,6 +59,8 @@ class ZipModParser {
                 check(out.parentFile!!.mkdirs() || out.parentFile!!.isDirectory)
                 val digest = MessageDigest.getInstance("SHA-256")
                 val crc = CRC32()
+                val header = ByteArray(UnityBundlePolicy.HEADER_SIZE)
+                var headerBytes = 0
                 var bytes = 0L
                 archive.getInputStream(entry).use { input ->
                     FileOutputStream(out).use { output ->
@@ -68,6 +70,11 @@ class ZipModParser {
                             if (n < 0) break
                             bytes += n; done += n
                             require(bytes <= entry.size && done <= Limits.TOTAL_BYTES) { "ZIP açılım sınırı aşıldı" }
+                            if (headerBytes < header.size) {
+                                val copied = minOf(n, header.size - headerBytes)
+                                buffer.copyInto(header, headerBytes, 0, copied)
+                                headerBytes += copied
+                            }
                             output.write(buffer, 0, n); digest.update(buffer, 0, n); crc.update(buffer, 0, n)
                             progress(done, total)
                         }
@@ -75,6 +82,7 @@ class ZipModParser {
                     }
                 }
                 require(bytes == entry.size && crc.value == entry.crc) { "Bozuk ZIP: boyut/CRC uyuşmuyor" }
+                UnityBundlePolicy.requireHeader(header.copyOf(headerBytes))
                 ModFile(path, bytes, digest.digest().joinToString("") { "%02x".format(it) })
             }
             require(files.isNotEmpty()) { "ZIP içinde uygulanabilir dosya yok" }

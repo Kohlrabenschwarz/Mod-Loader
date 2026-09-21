@@ -5,7 +5,6 @@ import android.system.Os
 import android.system.OsConstants
 import dev.modloader.domain.*
 import java.io.File
-import java.io.FileInputStream
 import java.io.RandomAccessFile
 import java.util.UUID
 
@@ -46,7 +45,7 @@ internal class TransactionEngine(private val storage: File, private val vaultRel
         try {
             SafeFs.writeAtomic(a, "probe")
             SafeFs.rename(a, b)
-            check(b.readText() == "probe")
+            check(SafeFs.readText(b) == "probe")
         } finally {
             if (a.exists()) check(a.delete())
             if (b.exists()) check(b.delete())
@@ -120,7 +119,7 @@ internal class TransactionEngine(private val storage: File, private val vaultRel
             entries.filter { it.originalHash != null }.forEach { entry ->
                 val source = SafeFs.checked(root, entry.file.path)
                 val backup = SafeFs.checked(dir, "old/${entry.file.path}")
-                FileInputStream(source).use { input ->
+                SafeFs.input(source).use { input ->
                     SafeFs.copy(input, backup, Limits.TOTAL_BYTES) { n ->
                         backedUp += n; progress("Yedekleme", backedUp, backupBytes)
                     }
@@ -221,7 +220,7 @@ internal class TransactionEngine(private val storage: File, private val vaultRel
             val hash = SafeFs.hash(target)
             if (hash != null) {
                 val preserved = SafeFs.checked(dir, "before-recovery/${entry.file.path}")
-                FileInputStream(target).use { SafeFs.copy(it, preserved, Limits.TOTAL_BYTES) }
+                SafeFs.input(target).use { SafeFs.copy(it, preserved, Limits.TOTAL_BYTES) }
                 check(SafeFs.hash(preserved) == hash)
             }
             observed.put(entry.file.path, hash ?: org.json.JSONObject.NULL)
@@ -237,7 +236,7 @@ internal class TransactionEngine(private val storage: File, private val vaultRel
         beforeMutation()
         val manifest = SafeFs.checked(dir, "recovery-sha.json")
         check(manifest.isFile && manifest.length() in 1..256L * 1024)
-        val observed = org.json.JSONObject(manifest.readText())
+        val observed = org.json.JSONObject(SafeFs.readText(manifest))
         journal.plan.entries.forEachIndexed { index, entry ->
             check(observed.has(entry.file.path))
             val expected = if (observed.isNull(entry.file.path)) null else observed.getString(entry.file.path)
@@ -252,7 +251,7 @@ internal class TransactionEngine(private val storage: File, private val vaultRel
                     val source = SafeFs.checked(dir, "old/${entry.file.path}")
                     check(SafeFs.hash(source) == entry.originalHash)
                     val temp = SafeFs.checked(dir, "restore.tmp")
-                    FileInputStream(source).use { SafeFs.copy(it, temp, Limits.TOTAL_BYTES) }
+                    SafeFs.input(source).use { SafeFs.copy(it, temp, Limits.TOTAL_BYTES) }
                     check(SafeFs.hash(temp) == entry.originalHash)
                     check(SafeFs.hash(SafeFs.checked(root, entry.file.path)) == current)
                     SafeFs.rename(temp, target)
@@ -312,7 +311,7 @@ internal class TransactionEngine(private val storage: File, private val vaultRel
                     val backup = SafeFs.checked(dir, "old/${entry.file.path}")
                     check(SafeFs.hash(backup) == entry.originalHash) { "Yedek bütünlüğü bozuk" }
                     val restore = SafeFs.checked(dir, "restore.tmp")
-                    FileInputStream(backup).use { SafeFs.copy(it, restore, Limits.TOTAL_BYTES) }
+                    SafeFs.input(backup).use { SafeFs.copy(it, restore, Limits.TOTAL_BYTES) }
                     check(SafeFs.hash(restore) == entry.originalHash)
                     // Kullanıcı/oyun kurtarma sırasında değiştirmişse ezme.
                     check(SafeFs.hash(SafeFs.checked(root, entry.file.path)) == current)

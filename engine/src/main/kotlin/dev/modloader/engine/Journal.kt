@@ -24,7 +24,7 @@ internal data class Journal(
     companion object {
         fun read(file: File, pkg: String, id: String): Journal {
             require(file.isFile && file.length() in 1..256L * 1024) { "Geçersiz işlem günlüğü" }
-            val obj = JSONObject(file.readText())
+            val obj = JSONObject(SafeFs.readText(file))
             require(obj.getInt("schema") == 1 && obj.getString("id") == id && obj.getString("package") == pkg)
             val array = obj.getJSONArray("entries")
             require(array.length() in 1..Limits.ENTRIES)

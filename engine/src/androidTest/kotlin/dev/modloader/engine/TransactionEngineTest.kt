@@ -27,7 +27,7 @@ class TransactionEngineTest {
                 out.putNextEntry(ZipEntry("info.json"))
                 out.write("""{"name":"Fixture","creator":"Tests","description":"Test","affectedFiles":["existing","new"]}""".toByteArray())
                 out.closeEntry()
-                listOf("files/gamedata/Resources/Bundles/existing" to "replacement", "files/gamedata/Resources/Bundles/new" to "added").forEach { (path, data) ->
+                listOf("files/gamedata/Resources/Bundles/existing" to "UnityFSreplacement", "files/gamedata/Resources/Bundles/new" to "UnityFSadded").forEach { (path, data) ->
                     out.putNextEntry(ZipEntry(path)); out.write(data.toByteArray()); out.closeEntry()
                 }
             }
@@ -57,7 +57,7 @@ class TransactionEngineTest {
         File(root, "files/gamedata/Resources/Bundles/new").writeText("external change")
         try { engine.restore(pkg, id, noop); fail("Conflict expected") }
         catch (e: dev.modloader.domain.EngineFailure) { assertEquals(7, e.code) }
-        assertEquals("replacement", File(root, "files/gamedata/Resources/Bundles/existing").readText())
+        assertEquals("UnityFSreplacement", File(root, "files/gamedata/Resources/Bundles/existing").readText())
         assertEquals("external change", File(root, "files/gamedata/Resources/Bundles/new").readText())
     }
 
@@ -65,11 +65,11 @@ class TransactionEngineTest {
         val engine = TransactionEngine(storage)
         val id = prepare(engine, zip)
         engine.apply(pkg, id, true, noop)
-        assertEquals("replacement", File(root, "files/gamedata/Resources/Bundles/existing").readText())
-        assertEquals("added", File(root, "files/gamedata/Resources/Bundles/new").readText())
+        assertEquals("UnityFSreplacement", File(root, "files/gamedata/Resources/Bundles/existing").readText())
+        assertEquals("UnityFSadded", File(root, "files/gamedata/Resources/Bundles/new").readText())
         assertEquals("original", File(root, ".backup/modloader-v1/$id/old/files/gamedata/Resources/Bundles/existing").readText())
         engine.recover(pkg, noop)
-        assertEquals("replacement", File(root, "files/gamedata/Resources/Bundles/existing").readText())
+        assertEquals("UnityFSreplacement", File(root, "files/gamedata/Resources/Bundles/existing").readText())
     }
 
     @Test fun crashAtEveryMutationBoundaryIsRecoverable() {
@@ -134,7 +134,7 @@ class TransactionEngineTest {
         val id = prepare(engine, zip)
         try { engine.apply(pkg, id, true, noop); fail("Lost reply expected") } catch (_: SimulatedDeath) { }
         TransactionEngine(storage).recover(pkg, noop)
-        assertEquals("replacement", File(root, "files/gamedata/Resources/Bundles/existing").readText())
-        assertEquals("added", File(root, "files/gamedata/Resources/Bundles/new").readText())
+        assertEquals("UnityFSreplacement", File(root, "files/gamedata/Resources/Bundles/existing").readText())
+        assertEquals("UnityFSadded", File(root, "files/gamedata/Resources/Bundles/new").readText())
     }
 }

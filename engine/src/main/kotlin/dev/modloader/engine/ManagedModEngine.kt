@@ -7,7 +7,6 @@ import dev.modloader.domain.*
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.io.RandomAccessFile
 import java.util.Locale
 import java.util.UUID
 
@@ -27,16 +26,13 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
     }
     private fun <T> locked(block: (File) -> T): T {
         val home = mods()
-        RandomAccessFile(SafeFs.checked(home, ".engine.lock"), "rw").use { file ->
-            val lock = file.channel.tryLock() ?: error("Başka mod işlemi çalışıyor")
-            lock.use {
+        return SafeFs.withFileLock(SafeFs.checked(home, ".engine.lock")) {
                 // Kilit alındı: çalışan bir import yok. Yayınlanmadan kesilen staging artık güvenle temizlenebilir.
                 home.list().orEmpty().filter { it.startsWith(".deleted-") || it.startsWith(".incoming-") }.forEach {
                     validId(it.removePrefix(".deleted-").removePrefix(".incoming-"))
                     SafeFs.removeTree(home, it)
                 }
-                return block(home)
-            }
+                block(home)
         }
     }
     private data class Record(val dir: File, val json: JSONObject) {
@@ -62,7 +58,7 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
         ModFolderPolicy.validate(dir.name)
         val file = SafeFs.checked(dir, "state.json")
         check(file.isFile && file.length() in 1..256L * 1024) { "Mod kaydı bozuk" }
-        val record = Record(dir, JSONObject(file.readText()))
+        val record = Record(dir, JSONObject(SafeFs.readText(file)))
         check(record.json.getInt("schema") == 1 && record.folder == dir.name)
         validId(record.id)
         require(record.transactions.size <= 20); record.transactions.forEach(::validId)
@@ -121,7 +117,7 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
         val source = if (record.active) journals.lastOrNull { it.state == "COMMITTED" } else journals.firstOrNull()
         val previous = if (file.exists()) {
             check(file.isFile && file.length() in 1..256L * 1024)
-            file.readText()
+            SafeFs.readText(file)
         } else null
         val document = if (source != null || previous == null) JSONObject().apply {
             put("schema", 1); put("modId", record.id)

@@ -23,7 +23,7 @@ class ManagedModEngineTest {
             val zip = File(storage, "test.zip")
             ZipOutputStream(zip.outputStream()).use { out ->
                 listOf("info.json" to """{"name":"test","creator":"Tests","description":"Fixture","affectedFiles":["existing","new"]}""",
-                    "payload/existing" to "replacement", "payload/new" to "added").forEach { (path, data) ->
+                    "payload/existing" to "UnityFSreplacement", "payload/new" to "UnityFSadded").forEach { (path, data) ->
                     out.putNextEntry(ZipEntry(path)); out.write(data.toByteArray()); out.closeEntry()
                 }
             }
@@ -75,7 +75,7 @@ class ManagedModEngineTest {
         File(bundles, "existing").writeText("game-update")
         engine.warningAction(id, false, noop)
         assertEquals("game-update", File(bundles, "existing").readText())
-        assertEquals("added", File(bundles, "new").readText())
+        assertEquals("UnityFSadded", File(bundles, "new").readText())
         assertFalse(File(bundles, "mods/test").exists())
         engine.warningAction(id, false, noop) // Lost Binder reply can be retried.
     }
@@ -125,7 +125,7 @@ class ManagedModEngineTest {
         assertFalse(active(storage))
         engine.setActive(id, true, noop)
         assertTrue(active(storage))
-        assertEquals("replacement", File(bundles, "existing").readText())
+        assertEquals("UnityFSreplacement", File(bundles, "existing").readText())
         assertTrue(File(bundles, "mods/test/backup").walkTopDown().any { it.isFile && it.name == "existing" && it.readText() == "original" })
         ManagedModEngine(storage).setActive(id, false, noop)
         assertFalse(active(storage))
@@ -165,7 +165,7 @@ class ManagedModEngineTest {
         assertFalse(active(storage))
         normal.setActive(id, true, noop)
         try { denied.setActive(id, false, noop); fail("Stop failure expected") } catch (_: IllegalStateException) { }
-        assertEquals("replacement", File(bundles, "existing").readText())
+        assertEquals("UnityFSreplacement", File(bundles, "existing").readText())
         assertTrue(active(storage))
         normal.setActive(id, false, noop)
         assertEquals("original", File(bundles, "existing").readText())
@@ -179,7 +179,7 @@ class ManagedModEngineTest {
                 fail("Expected simulated death")
             } catch (_: Death) { }
             assertEquals(boundary == "MOD_COMMITTED", active(storage))
-            assertEquals(if (boundary == "MOD_COMMITTED") "replacement" else "original", File(bundles, "existing").readText())
+                assertEquals(if (boundary == "MOD_COMMITTED") "UnityFSreplacement" else "original", File(bundles, "existing").readText())
         } }
     }
     @Test fun duplicateNamesPreserveArchivesAndConflictingModsCannotActivate() = fixture { storage, bundles, zip ->
@@ -190,7 +190,7 @@ class ManagedModEngineTest {
         engine.setActive(first, true, noop)
         try { engine.setActive(second, true, noop); fail("Conflict expected") }
         catch (e: dev.modloader.domain.EngineFailure) { assertTrue(e.code == 7 || e.code == 8) }
-        assertEquals("replacement", File(bundles, "existing").readText())
+        assertEquals("UnityFSreplacement", File(bundles, "existing").readText())
         assertEquals(1, JSONArray(engine.list()).let { a -> (0 until a.length()).count { a.getJSONObject(it).getBoolean("active") } })
     }
     @Test fun legacyBackupMovesWithActiveState() = fixture { storage, bundles, zip ->
@@ -229,7 +229,7 @@ class ManagedModEngineTest {
         catch (e: dev.modloader.domain.EngineFailure) { assertEquals(7, e.code) }
         assertEquals("updated game", File(bundles, "existing").readText())
         assertTrue(File(bundles, "mods/test/backup").walkTopDown().any { it.name == "existing" && it.isFile && it.readText() == "original" })
-        File(bundles, "existing").writeText("replacement")
+        File(bundles, "existing").writeText("UnityFSreplacement")
         assertFalse(JSONArray(engine.list()).getJSONObject(0).getBoolean("shaMismatch"))
         engine.setActive(id, false, noop)
         assertEquals("original", File(bundles, "existing").readText())
