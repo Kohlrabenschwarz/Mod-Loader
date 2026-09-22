@@ -1251,7 +1251,7 @@
     "noticeFiles": []
   },
   {
-    "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2",
+    "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0",
     "projectUrl": "https://github.com/Kotlin/kotlinx.coroutines",
     "declaredLicenses": [
       {
@@ -1265,7 +1265,7 @@
     "noticeFiles": []
   },
   {
-    "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.10.2",
+    "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.11.0",
     "projectUrl": "https://github.com/Kotlin/kotlinx.coroutines",
     "declaredLicenses": [
       {
@@ -1279,7 +1279,7 @@
     "noticeFiles": []
   },
   {
-    "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2",
+    "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0",
     "projectUrl": "https://github.com/Kotlin/kotlinx.coroutines",
     "declaredLicenses": [
       {
@@ -1293,7 +1293,7 @@
     "noticeFiles": []
   },
   {
-    "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2",
+    "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0",
     "projectUrl": "https://github.com/Kotlin/kotlinx.coroutines",
     "declaredLicenses": [
       {
@@ -1377,3 +1377,4 @@
     "noticeFiles": []
   }
 ]
+
