@@ -10,6 +10,11 @@ The app is written in Kotlin with Jetpack Compose and uses a Shizuku user servic
 
 [Download the latest release](https://github.com/Kohlrabenschwarz/Mod-Loader/releases/latest) · [Read the user agreement](TERMS.md) · [Create a mod package](examples/TEMPLATE.md) · [Open in Android Studio](ANDROID_STUDIO.md)
 
+**Looking for more help?**
+
+
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/dUcABJtzpJ)
+
 ## Please read this before using the app
 
 Mod Loader is an independent file-management tool. It is not affiliated with, approved by, sponsored by, or supported by Nekki Limited or Banzai Games.
