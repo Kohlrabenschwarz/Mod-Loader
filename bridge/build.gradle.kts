@@ -10,5 +10,5 @@ dependencies {
     api(project(":engine"))
     implementation("dev.rikka.shizuku:api:13.1.5")
     api("dev.rikka.shizuku:provider:13.1.5") // app manifest'i provider sınıfını doğrudan kullanır.
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }
