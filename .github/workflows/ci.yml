@@ -30,7 +30,7 @@ jobs:
           cache: gradle
 
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+        uses: gradle/actions/wrapper-validation@v6
 
       - name: Run JVM tests, lint, and debug builds
         run: ./gradlew --no-daemon test :app:lintDebug :app:assembleDebug :engine:assembleDebugAndroidTest
