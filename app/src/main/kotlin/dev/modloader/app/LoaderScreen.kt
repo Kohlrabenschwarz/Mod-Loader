@@ -2,9 +2,15 @@ package dev.modloader.app
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +18,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import dev.modloader.domain.ModSearch
+import dev.modloader.domain.GameTarget
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,24 +28,47 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import dev.modloader.bridge.ShizukuStatus
 
 @Composable
 fun LoaderScreen(ui: LoaderUi, status: ShizukuStatus, attempt: Int,
     onCheckUpdates: () -> Unit = {}, onUpdate: () -> Unit = {},
-    onImport: () -> Unit = {}, onPlay: () -> Unit = {}, onLanguage: (String) -> Unit = {},
+    onImport: () -> Unit = {}, onImportLink: (String) -> Unit = {}, onPlay: () -> Unit = {}, onLanguage: (String) -> Unit = {},
     onDark: (Boolean) -> Unit = {}, onAccent: (Accent) -> Unit = {},
     onToggle: (String, Boolean) -> Unit = { _, _ -> }, onDelete: (String) -> Unit = {},
+    onRetryConnection: () -> Unit = {}, onRepair: (String) -> Unit = {},
+    onCheckModUpdate: (String) -> Unit = {}, onInstallModUpdate: (String) -> Unit = {},
+    onDeveloperMode: (Boolean) -> Unit = {}, onPublicationBaseUrl: (String) -> Unit = {},
+    onCancelImport: () -> Unit = {}, onOverwriteImport: (String) -> Unit = {},
     onWarningAction: (String, Boolean) -> Unit = { _, _ -> }, onIgnore: (String, Boolean) -> Unit = { _, _ -> }) {
     val text = uiText(ui.language)
     var settings by remember { mutableStateOf(false) }
     var agreementOpen by remember { mutableStateOf(false) }
+    var importMenuOpen by remember { mutableStateOf(false) }
+    var linkDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var importUrl by rememberSaveable { mutableStateOf("") }
+    val importEnabled = !ui.busy && ui.importCollision == null
+    LaunchedEffect(importEnabled) { if (!importEnabled) importMenuOpen = false }
+    val menuOffset = with(LocalDensity.current) { IntOffset(0, -76.dp.roundToPx()) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val filteredMods = remember(ui.mods, query) { ui.mods.filter { mod ->
+        ModSearch.matches(query, mod.metadata.name, mod.metadata.creator, mod.metadata.description,
+            mod.metadata.version, mod.folder, mod.metadata.affectedFiles.joinToString("\n"))
+    } }
     val connected = status == ShizukuStatus.READY
     val ready = connected && !ui.busy
+    val libraryHealthy = ui.mods.none { it.issue == "INVALID_RECORD" }
     val statusLabel = text.get(when (status) {
         ShizukuStatus.READY -> R.string.connected
         ShizukuStatus.CONNECTING -> R.string.connecting
@@ -47,21 +79,40 @@ fun LoaderScreen(ui: LoaderUi, status: ShizukuStatus, attempt: Int,
         ShizukuStatus.ERROR -> R.string.connection_failed
     })
     Scaffold(floatingActionButton = {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.End) {
+            if (!importMenuOpen) {
             FloatingActionButton(onClick = {
                 if (!ui.busy) onPlay()
-            }, shape = CircleShape, modifier = Modifier.size(56.dp),
+            }, shape = CircleShape, modifier = Modifier.padding(end = 4.dp).size(56.dp),
                 containerColor = if (ui.busy) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.secondaryContainer) {
                 Icon(painterResource(R.drawable.ic_play), contentDescription =
                     if (connected) text.get(R.string.restart_game) else text.get(R.string.open_game))
             }
-        FloatingActionButton(onClick = {
-            if (!ui.busy) onImport()
-        }, shape = CircleShape, modifier = Modifier.size(64.dp).semantics {
-            contentDescription = text.get(R.string.import_zip)
-        }, containerColor = if (ui.busy) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primaryContainer) {
-            Text("+", style = MaterialTheme.typography.headlineLarge)
-        }
+            }
+            Box {
+                FloatingActionButton(onClick = {
+                    if (importEnabled) importMenuOpen = !importMenuOpen
+                }, shape = CircleShape, modifier = Modifier.size(64.dp).semantics {
+                    contentDescription = text.get(if (importMenuOpen) R.string.close_import_menu else R.string.import_zip)
+                }, containerColor = if (importEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant) {
+                    Text(if (importMenuOpen) "×" else "+", style = MaterialTheme.typography.headlineLarge)
+                }
+                if (importMenuOpen) Popup(alignment = Alignment.BottomEnd, offset = menuOffset,
+                    onDismissRequest = { importMenuOpen = false }, properties = PopupProperties(focusable = true)) {
+                    val appearing = remember { MutableTransitionState(false).apply { targetState = true } }
+                    androidx.compose.animation.AnimatedVisibility(visibleState = appearing, enter = fadeIn() + slideInVertically { it / 2 }) {
+                        Column(Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalAlignment = Alignment.End) {
+                            ImportMenuButton(text.get(R.string.import_from_link), R.drawable.ic_import_link) {
+                                importMenuOpen = false; linkDialogOpen = true
+                            }
+                            ImportMenuButton(text.get(R.string.import_from_file), R.drawable.ic_import_file) {
+                                importMenuOpen = false; onImport()
+                            }
+                        }
+                    }
+                }
+            }
         }
     }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
@@ -88,6 +139,10 @@ fun LoaderScreen(ui: LoaderUi, status: ShizukuStatus, attempt: Int,
                         color = if (connected) Color(0xFF166534) else Color(0xFF991B1B))
                     if (status == ShizukuStatus.CONNECTING || status == ShizukuStatus.PERMISSION_REQUIRED)
                         Text(text.get(R.string.attempt, attempt), color = Color(0xFF991B1B))
+                    if (status == ShizukuStatus.DENIED) Text(text.get(R.string.permission_hint), color = Color(0xFF991B1B))
+                    if (status == ShizukuStatus.UNSUPPORTED) Text(text.get(R.string.backend_hint), color = Color(0xFF991B1B))
+                    if (status in setOf(ShizukuStatus.OFFLINE, ShizukuStatus.ERROR, ShizukuStatus.DENIED))
+                        TextButton(onClick = onRetryConnection, enabled = !ui.busy) { Text(text.get(R.string.retry_connection)) }
                 }
             } }
             item {
@@ -99,16 +154,24 @@ fun LoaderScreen(ui: LoaderUi, status: ShizukuStatus, attempt: Int,
                     Notice.UPDATED -> text.get(R.string.updated)
                     Notice.DELETED -> text.get(R.string.deleted)
                     Notice.LAUNCHING -> text.get(R.string.launching)
-                    Notice.ERROR -> text.get(errorText(ui.errorCode))
+                    Notice.ERROR -> ui.linkImportError?.let { text.get(R.string.import_link_failed, it) }
+                        ?: text.get(errorText(ui.errorCode))
                 }
                 Text(notice, color = if (ui.notice == Notice.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                ui.errorConflicts.forEach { conflict ->
+                    Text(conflict.name, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    conflict.files.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                }
                 if (!connected && ui.mods.isNotEmpty()) Text(text.get(R.string.cached), style = MaterialTheme.typography.bodySmall)
                 ui.progress?.let { progress ->
                     Spacer(Modifier.height(8.dp))
-                    Text(text.get(R.string.processing))
+                    Text(text.get(progressText(progress.phase)))
                     val fraction = progress.fraction
                     if (fraction == null) LinearProgressIndicator(Modifier.fillMaxWidth())
                     else { LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth()); Text("${(fraction * 100).toInt()}%") }
+                    if (progress.phase in setOf("import", "link-import", "update-download", "ZIP aktarımı", "ZIP doğrulama", "Mod arşivleniyor", "Mod doğrulanıyor", "Yedekleme"))
+                        Text(if (progress.total > 0) "${sizeText(progress.done)} / ${sizeText(progress.total)}" else sizeText(progress.done),
+                            style = MaterialTheme.typography.bodySmall)
                 }
             }
             if (ui.updateVersion != null) item {
@@ -118,14 +181,35 @@ fun LoaderScreen(ui: LoaderUi, status: ShizukuStatus, attempt: Int,
                     TextButton(enabled = !ui.busy, onClick = onUpdate) { Text(text.get(R.string.download_update)) }
                 } }
             }
-            item { Text(text.get(R.string.mods_count, ui.mods.size), style = MaterialTheme.typography.titleLarge) }
+            item {
+                Text(text.get(R.string.mods_count, ui.mods.size), style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), label = { Text(text.get(R.string.search_mods)) },
+                    placeholder = { Text(text.get(R.string.search_hint)) },
+                    trailingIcon = if (query.isNotEmpty()) { {
+                        TextButton(onClick = { query = "" }) { Text(text.get(R.string.clear_search)) }
+                    } } else null)
+                if (query.isNotBlank()) Text(text.get(R.string.search_results, filteredMods.size, ui.mods.size),
+                    style = MaterialTheme.typography.bodySmall)
+            }
             if (ui.mods.isEmpty()) item { OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(24.dp)) {
                 Text(text.get(R.string.empty_title), style = MaterialTheme.typography.titleMedium)
                 Text(text.get(R.string.empty_hint))
             } } }
-            items(ui.mods, key = { it.id }) { mod ->
-                ModRow(mod, ui.language, ready && mod.archived, !ui.busy,
-                    canDelete = !ui.busy && (!mod.archived || ready) && !(mod.active && mod.shaMismatch),
+            if (ui.mods.isNotEmpty() && filteredMods.isEmpty()) item {
+                Text(text.get(R.string.no_search_results), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            items(filteredMods, key = { it.id }) { mod ->
+                ModRow(mod, ui.language, ready && libraryHealthy && mod.archived, !ui.busy,
+                    update = ui.modUpdates[mod.id] ?: ModUpdateUi(), developerMode = ui.developerMode,
+                    onCheckUpdate = { onCheckModUpdate(mod.id) }, onInstallUpdate = { onInstallModUpdate(mod.id) },
+                    canDelete = !ui.busy && mod.issue != "INVALID_RECORD" && (!mod.archived || (ready && libraryHealthy)) && !(mod.active && mod.shaMismatch),
+                    conflicts = ui.mods.filter { other -> other.id != mod.id && other.active }.mapNotNull { other ->
+                        val paths = other.metadata.affectedFiles.map { it.lowercase(java.util.Locale.ROOT) }.toSet()
+                        mod.metadata.affectedFiles.filter { it.lowercase(java.util.Locale.ROOT) in paths }
+                            .takeIf { it.isNotEmpty() }?.let { other.metadata.name to it }
+                    }, onReimport = onImport, onRepair = { onRepair(mod.id) },
                     onToggle = { onToggle(mod.id, it) }, onDelete = { onDelete(mod.id) },
                     onWarningAction = { onWarningAction(mod.id, it) }, onIgnore = { onIgnore(mod.id, it) })
             }
@@ -133,15 +217,86 @@ fun LoaderScreen(ui: LoaderUi, status: ShizukuStatus, attempt: Int,
     }
     if (settings) AlertDialog(onDismissRequest = { settings = false }, title = { Text(text.get(R.string.settings)) },
         text = { SettingsPanel(ui, onLanguage, onDark, onAccent, onCheckUpdates, onUpdate,
-            onAgreement = { settings = false; agreementOpen = true }) },
+            onAgreement = { settings = false; agreementOpen = true },
+            onDeveloperMode = onDeveloperMode, onPublicationBaseUrl = onPublicationBaseUrl) },
         confirmButton = { TextButton(onClick = { settings = false }) { Text(text.get(R.string.done)) } })
     if (agreementOpen) UserAgreementDialog(ui.language, required = false, onLanguage = onLanguage,
         onDismiss = { agreementOpen = false })
+    if (linkDialogOpen) {
+        val validUrl = importUrl.isNotBlank() && runCatching {
+            dev.modloader.domain.ModUpdatePolicy.httpsUrl(importUrl.trim())
+        }.isSuccess
+        AlertDialog(onDismissRequest = { linkDialogOpen = false },
+            title = { Text(text.get(R.string.import_from_link)) },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(text.get(R.string.import_link_hint), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value = importUrl, onValueChange = { importUrl = it },
+                    label = { Text(text.get(R.string.import_link_url)) }, modifier = Modifier.fillMaxWidth(),
+                    singleLine = true, isError = importUrl.isNotEmpty() && !validUrl,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (validUrl && importEnabled) { linkDialogOpen = false; onImportLink(importUrl.trim()) }
+                    }))
+            } },
+            confirmButton = { TextButton(enabled = validUrl && importEnabled, onClick = {
+                linkDialogOpen = false; onImportLink(importUrl.trim())
+            }) { Text(text.get(R.string.import_link_confirm)) } },
+            dismissButton = { TextButton(onClick = { linkDialogOpen = false }) { Text(text.get(R.string.cancel_action)) } })
+    }
+    ui.importCollision?.let { collision ->
+        var selectedId by remember(collision.incoming.id) { mutableStateOf(collision.existing.first().id) }
+        val selected = ui.mods.firstOrNull { it.id == selectedId }
+        val selectedPreview = collision.existing.firstOrNull { it.id == selectedId }
+        val previewMatches = selected != null && selected.archiveSha256 == selectedPreview?.archiveSha256
+        AlertDialog(onDismissRequest = { if (!ui.busy) onCancelImport() },
+            title = { Text(text.get(R.string.import_collision_title)) },
+            text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                Text(text.get(R.string.import_collision_body, collision.incoming.metadata.name, collision.incoming.metadata.version))
+                collision.existing.forEach { existing ->
+                    Row(Modifier.fillMaxWidth().clickable(enabled = !ui.busy) { selectedId = existing.id },
+                        verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = selectedId == existing.id, onClick = { selectedId = existing.id }, enabled = !ui.busy)
+                        Column(Modifier.weight(1f)) {
+                            Text("${existing.metadata.name} · v${existing.metadata.version}")
+                            Text(existing.folder.ifEmpty { existing.id.take(8) }, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                Text(text.get(R.string.import_overwrite_hint), style = MaterialTheme.typography.bodySmall)
+                if (selected?.archived == true && status != ShizukuStatus.READY)
+                    Text(text.get(R.string.import_overwrite_connection), color = MaterialTheme.colorScheme.error)
+                if (!previewMatches) Text(text.get(R.string.import_overwrite_stale), color = MaterialTheme.colorScheme.error)
+                if (selected?.shaMismatch == true) Text(text.get(errorText(7)), color = MaterialTheme.colorScheme.error)
+                if (ui.notice == Notice.ERROR) Text(text.get(errorText(ui.errorCode)), color = MaterialTheme.colorScheme.error)
+            } },
+            confirmButton = { TextButton(enabled = !ui.busy && previewMatches && selected.issue == null &&
+                !selected.shaMismatch && !selected.damagedArchive &&
+                (!selected.archived || status == ShizukuStatus.READY), onClick = { onOverwriteImport(selectedId) }) {
+                Text(text.get(R.string.import_overwrite))
+            } },
+            dismissButton = { TextButton(enabled = !ui.busy, onClick = onCancelImport) { Text(text.get(R.string.cancel_action)) } })
+    }
+}
+
+@Composable
+private fun ImportMenuButton(label: String, icon: Int, onClick: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 2.dp, modifier = Modifier.clickable(onClick = onClick)) {
+            Text(label, Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+        }
+        SmallFloatingActionButton(onClick = onClick, shape = CircleShape, modifier = Modifier.size(48.dp),
+            containerColor = MaterialTheme.colorScheme.secondaryContainer) {
+            Icon(painterResource(icon), contentDescription = label)
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnabled: Boolean, canDelete: Boolean,
+    update: ModUpdateUi, developerMode: Boolean, onCheckUpdate: () -> Unit, onInstallUpdate: () -> Unit,
+    conflicts: List<Pair<String, List<String>>>, onReimport: () -> Unit, onRepair: () -> Unit,
     onToggle: (Boolean) -> Unit, onDelete: () -> Unit, onWarningAction: (Boolean) -> Unit, onIgnore: (Boolean) -> Unit) {
     val text = uiText(language)
     var expanded by remember(mod.id) { mutableStateOf(false) }
@@ -149,6 +304,7 @@ private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnab
     var warningOpen by remember(mod.id) { mutableStateOf(false) }
     var warningChoice by remember(mod.id) { mutableStateOf<String?>(null) }
     var activationPending by remember(mod.id) { mutableStateOf(false) }
+    var updatePending by remember(mod.id) { mutableStateOf(false) }
     OutlinedCard(Modifier.fillMaxWidth().combinedClickable(enabled = menuEnabled,
         onClick = { expanded = !expanded }, onLongClick = { menuOpen = true }, onLongClickLabel = text.get(R.string.mod_options))) {
         Column(Modifier.padding(14.dp)) {
@@ -168,8 +324,9 @@ private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnab
                     Box(contentAlignment = Alignment.Center) { Text(mod.metadata.name.take(1).uppercase(), style = MaterialTheme.typography.headlineMedium) }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(mod.metadata.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("${mod.metadata.creator} · v${mod.metadata.version}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(if (mod.damagedArchive && mod.folder.isNotBlank()) mod.folder else mod.metadata.name,
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (!mod.damagedArchive) Text("${mod.metadata.creator} · v${mod.metadata.version}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     Text(mod.metadata.description, style = MaterialTheme.typography.bodyMedium,
                         maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
@@ -182,15 +339,57 @@ private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnab
                 }
                 Switch(checked = mod.active, onCheckedChange = { active ->
                     if (active) activationPending = true else onToggle(false)
-                }, enabled = enabled && mod.issue == null && !mod.shaMismatch,
+                }, enabled = enabled && mod.issue == null && !mod.shaMismatch && !mod.damagedArchive,
                     modifier = Modifier.semantics { contentDescription = text.get(R.string.activate_mod, mod.metadata.name) })
             }
             if (!mod.archived) Text(text.get(R.string.waiting_archive), style = MaterialTheme.typography.bodySmall)
             if (mod.issue != null) Text(text.get(R.string.state_issue), color = MaterialTheme.colorScheme.error)
+            if (mod.issue == "INVALID_RECORD") Text(text.get(R.string.invalid_record), color = MaterialTheme.colorScheme.error)
+            if (mod.damagedArchive) {
+                Text(text.get(R.string.damaged_archive), color = MaterialTheme.colorScheme.error)
+                if (mod.archived && mod.issue == null) TextButton(enabled = enabled, onClick = onRepair) { Text(text.get(R.string.repair_archive)) }
+            }
+            if (mod.damagedArchive || mod.issue == "INVALID_RECORD")
+                TextButton(enabled = menuEnabled, onClick = onReimport) { Text(text.get(R.string.reimport_archive)) }
             if (expanded) {
                 HorizontalDivider(); Spacer(Modifier.height(8.dp))
+                if (developerMode && mod.archived && mod.folder.isNotEmpty()) {
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(text.get(R.string.dev_files_location, "${GameTarget.RESOURCES_PATH}mods/${mod.folder}/.dev"),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 Text(text.get(R.string.affected_files), style = MaterialTheme.typography.labelLarge)
                 mod.metadata.affectedFiles.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                if (mod.requiredBytes > 0 && !mod.active) {
+                    Text(text.get(R.string.space_estimate, sizeText(mod.requiredBytes), sizeText(mod.availableBytes)),
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                if (mod.metadata.update != null && !mod.damagedArchive) {
+                    TextButton(enabled = menuEnabled && update.status != ModUpdateStatus.CHECKING, onClick = onCheckUpdate) {
+                        Text(text.get(if (update.status == ModUpdateStatus.CHECKING) R.string.update_checking else R.string.mod_check_update))
+                    }
+                    when (update.status) {
+                        ModUpdateStatus.CURRENT -> Text(text.get(R.string.mod_update_current), style = MaterialTheme.typography.bodySmall)
+                        ModUpdateStatus.ERROR -> {
+                            Text(text.get(errorText(update.errorCode)), color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall)
+                            update.errorDetail?.let { detail ->
+                                Text(text.get(R.string.mod_update_diagnostic, detail), style = MaterialTheme.typography.bodySmall)
+                            }
+                            Text(text.get(R.string.mod_update_source,
+                                ModUpdates.diagnosticSource(mod.metadata.update!!.manifestUrl)),
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                        ModUpdateStatus.AVAILABLE -> {
+                            Text(text.get(R.string.update_available, update.release!!.version), style = MaterialTheme.typography.bodySmall)
+                            TextButton(enabled = enabled && mod.issue == null && !mod.shaMismatch, onClick = { updatePending = true }) {
+                                Text(text.get(R.string.mod_download_update))
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
             }
             if (mod.shaMismatch && !mod.warningHidden) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 IconButton(onClick = { warningOpen = true }) {
@@ -200,6 +399,18 @@ private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnab
             }
         }
     }
+    if (updatePending && update.release != null) AlertDialog(onDismissRequest = { updatePending = false },
+        title = { Text(text.get(R.string.update_available, update.release.version)) },
+        text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text.get(R.string.mod_update_confirm))
+            Text(text.get(R.string.mod_update_source, dev.modloader.domain.ModUpdatePolicy.httpsUrl(mod.metadata.update!!.manifestUrl).host))
+            Text(sizeText(update.release.zipSize))
+            if (update.release.changelog.isNotEmpty()) Text(update.release.changelog)
+            Text(text.get(R.string.mod_update_hash_hint), style = MaterialTheme.typography.bodySmall)
+        } },
+        confirmButton = { TextButton(enabled = enabled && mod.issue == null && !mod.shaMismatch,
+            onClick = { updatePending = false; onInstallUpdate() }) { Text(text.get(R.string.mod_download_update)) } },
+        dismissButton = { TextButton(onClick = { updatePending = false }) { Text(text.get(R.string.cancel_action)) } })
     if (activationPending) AlertDialog(
         onDismissRequest = { activationPending = false },
         title = { Text(text.get(R.string.activate_confirm_title)) },
@@ -209,17 +420,48 @@ private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnab
                 Text(text.get(R.string.activate_confirm_body))
                 Text(text.get(R.string.unverified_metadata), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error)
+                if (mod.requiredBytes > 0) Text(text.get(R.string.space_estimate,
+                    sizeText(mod.requiredBytes), sizeText(mod.availableBytes)))
+                if (mod.requiredBytes > mod.availableBytes) Text(text.get(R.string.error_space), color = MaterialTheme.colorScheme.error)
+                if (conflicts.isNotEmpty()) {
+                    Text(text.get(R.string.conflict_details), color = MaterialTheme.colorScheme.error)
+                    conflicts.forEach { (name, paths) ->
+                        Text(name, fontWeight = FontWeight.Bold)
+                        paths.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                    }
+                }
                 Text(text.get(R.string.affected_files), style = MaterialTheme.typography.labelLarge)
                 mod.metadata.affectedFiles.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
             }
         },
-        confirmButton = { TextButton(enabled = enabled, onClick = { activationPending = false; onToggle(true) }) {
+        confirmButton = { TextButton(enabled = enabled && conflicts.isEmpty() && mod.requiredBytes <= mod.availableBytes,
+            onClick = { activationPending = false; onToggle(true) }) {
             Text(text.get(R.string.activate_anyway))
         } },
         dismissButton = { TextButton(onClick = { activationPending = false }) { Text(text.get(R.string.cancel_action)) } }
     )
     if (warningOpen) AlertDialog(onDismissRequest = { warningOpen = false },
-        title = { Text(text.get(R.string.sha_title)) }, text = { Text(text.get(R.string.sha_body)) },
+        title = { Text(text.get(R.string.sha_title)) }, text = {
+            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text.get(R.string.sha_body))
+                Text(text.get(R.string.backup_date, if (mod.backupAt > 0)
+                    java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT,
+                        java.util.Locale.forLanguageTag(language)).format(java.util.Date(mod.backupAt))
+                    else text.get(R.string.unknown_date)))
+                Text(text.get(R.string.warning_actions_help))
+                mod.changes.forEach { change ->
+                    HorizontalDivider()
+                    Text(change.path, fontWeight = FontWeight.Bold)
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Column {
+                            Text(text.get(R.string.expected_hash, change.expected ?: text.get(R.string.missing_file)), style = MaterialTheme.typography.bodySmall)
+                            Text(text.get(R.string.current_hash, if (change.actual == "unreadable") text.get(R.string.unreadable_file)
+                                else change.actual ?: text.get(R.string.missing_file)), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        },
         confirmButton = { Column(horizontalAlignment = Alignment.End) {
             TextButton(enabled = enabled, onClick = { warningOpen = false; warningChoice = "delete" }) { Text(text.get(R.string.delete)) }
             TextButton(enabled = enabled, onClick = { warningOpen = false; warningChoice = "recover" }) { Text(text.get(R.string.recover_base)) }
@@ -240,6 +482,19 @@ private fun ModRow(mod: LibraryMod, language: String, enabled: Boolean, menuEnab
     }
 }
 
+private fun sizeText(bytes: Long): String = String.format(java.util.Locale.ROOT, "%.1f MiB", bytes / (1024.0 * 1024.0))
+private fun progressText(phase: String): Int = when (phase) {
+    "link-import" -> R.string.import_link_downloading
+    "update-download" -> R.string.mod_update_downloading
+    "import", "ZIP aktarımı", "Mod arşivleniyor" -> R.string.phase_import
+    "ZIP doğrulama", "Mod doğrulanıyor" -> R.string.phase_validate
+    "Hedef dosyalar inceleniyor", "Uygulama öncesi doğrulama" -> R.string.phase_inspect
+    "Yedekleme" -> R.string.phase_backup
+    "Dosyalar uygulanıyor" -> R.string.phase_apply
+    "restore", "Geri alma" -> R.string.phase_restore
+    else -> R.string.processing
+}
+
 // Hatalar Binder mesajının diliyle değil, sabit kod üzerinden seçili dilde gösterilir.
 private fun errorText(code: Int): Int = when (code) {
     1 -> R.string.error_access
@@ -254,6 +509,9 @@ private fun errorText(code: Int): Int = when (code) {
     11 -> R.string.no_base_backup
     12 -> R.string.game_data_missing
     13 -> R.string.error_bundle_header
+    14 -> R.string.mod_update_hash_error
+    15 -> R.string.mod_update_network_error
+    16 -> R.string.mod_update_metadata_error
     else -> R.string.operation_error
 }
 
@@ -261,9 +519,37 @@ private fun errorText(code: Int): Int = when (code) {
 @Composable
 fun SettingsPanel(ui: LoaderUi, onLanguage: (String) -> Unit = {}, onDark: (Boolean) -> Unit = {},
     onAccent: (Accent) -> Unit = {}, onCheckUpdates: () -> Unit = {}, onUpdate: () -> Unit = {},
-    onAgreement: () -> Unit = {}) {
+    onAgreement: () -> Unit = {}, onDeveloperMode: (Boolean) -> Unit = {}, onPublicationBaseUrl: (String) -> Unit = {}) {
     val text = uiText(ui.language)
+    var publicationUrl by remember(ui.publicationBaseUrl) { mutableStateOf(ui.publicationBaseUrl) }
+    val validPublication = remember(publicationUrl) {
+        runCatching { dev.modloader.domain.DeveloperPublicationPolicy.baseUrl(publicationUrl) }.isSuccess
+    }
+    val focusManager = LocalFocusManager.current
+    val savePublication = {
+        if (!ui.busy && validPublication && publicationUrl != ui.publicationBaseUrl) onPublicationBaseUrl(publicationUrl)
+        focusManager.clearFocus()
+    }
     Column(Modifier.verticalScroll(rememberScrollState())) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(text.get(R.string.dev_mode), modifier = Modifier.weight(1f))
+                Switch(checked = ui.developerMode, onCheckedChange = onDeveloperMode, enabled = !ui.busy,
+                    modifier = Modifier.semantics { contentDescription = text.get(R.string.dev_mode) })
+            }
+            if (ui.developerMode) {
+                Text(text.get(R.string.dev_mode_help), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value = publicationUrl, onValueChange = { publicationUrl = it },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !ui.busy,
+                    label = { Text(text.get(R.string.dev_publication_url)) }, isError = !validPublication,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { savePublication() }))
+                if (!validPublication) Text(text.get(R.string.dev_publication_invalid), color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall)
+                TextButton(enabled = !ui.busy && validPublication && publicationUrl != ui.publicationBaseUrl,
+                    onClick = savePublication) { Text(text.get(R.string.dev_publication_save)) }
+                if (ui.publicationBaseUrl.isEmpty()) Text(text.get(R.string.dev_draft_hint), style = MaterialTheme.typography.bodySmall)
+            }
+            HorizontalDivider()
             Text(text.get(R.string.app_updates), style = MaterialTheme.typography.titleMedium)
             val updateLabel = when (ui.updateStatus) {
                 UpdateStatus.CHECKING -> R.string.update_checking

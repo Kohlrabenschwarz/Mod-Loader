@@ -10,11 +10,12 @@ import java.util.zip.CRC32
 import java.util.zip.ZipFile
 
 data class ModMetadata(val name: String, val creator: String, val description: String,
-    val version: String, val affectedFiles: List<String>, val icon: ByteArray?)
+    val version: String, val affectedFiles: List<String>, val icon: ByteArray?,
+    val modId: String? = null, val versionCode: Long? = null, val update: ModUpdateSource? = null)
 
 /** Aynı okuyucu normal uygulamada ve privileged serviste çalışır; metadata hedef yolu belirleyemez. */
 object ModMetadataReader {
-    private val presentation = setOf("info.json", "icon.png", "icon.jpg", "icon.webp")
+    private val presentation = ModPackageFiles.metadata
     fun read(file: File): ModMetadata {
         ZipPreflight.check(file)
         ZipFile(file).use { zip ->
@@ -43,6 +44,17 @@ object ModMetadataReader {
                 .decode(ByteBuffer.wrap(infoBytes)).toString()
             val info = JSONObject(infoText)
             require(info.optInt("schemaVersion", 1) == 1) { "Desteklenmeyen info.json sürümü" }
+            val modId = if (info.has("modId")) ModUpdatePolicy.modId(ModUpdateJson.text(info, "modId")) else null
+            val versionCode = if (info.has("versionCode")) ModUpdatePolicy.versionCode(ModUpdateJson.integer(info, "versionCode")) else null
+            require((modId == null) == (versionCode == null)) { "modId and versionCode must appear together" }
+            val update = zip.getEntry("update.json")?.let {
+                val updateText = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes("update.json", ModUpdatePolicy.METADATA_BYTES))).toString()
+                ModUpdateJson.source(updateText).also { source ->
+                    require(source.modId == modId && versionCode != null && info.has("version")) { "Update identity missing or mismatched" }
+                }
+            }
             fun field(key: String, max: Int, multiline: Boolean = false): String {
                 val value = info.get(key)
                 require(value is String) { "Geçersiz $key" }
@@ -76,10 +88,10 @@ object ModMetadataReader {
             require(actual.map { it.lowercase(Locale.ROOT) }.distinct().size == actual.size) { "Çakışan mod yolları" }
             require(actual.toSet() == affected.toSet()) { "affectedFiles ile ZIP içeriği uyuşmuyor" }
             val iconName = if (info.has("icon")) field("icon", 32) else null
-            require(iconName == null || iconName in presentation - "info.json") { "İkon icon.png, icon.jpg veya icon.webp olmalı" }
+            require(iconName == null || iconName in ModPackageFiles.icons) { "İkon icon.png, icon.jpg veya icon.webp olmalı" }
             return ModMetadata(field("name", 100), field("creator", 100), field("description", 2000, multiline = true),
                 if (info.has("version")) field("version", 40) else "1.0", affected,
-                iconName?.let { bytes(it, Limits.ICON_BYTES) })
+                iconName?.let { bytes(it, Limits.ICON_BYTES) }, modId, versionCode, update)
         }
     }
 }

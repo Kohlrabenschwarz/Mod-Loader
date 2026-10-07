@@ -15,10 +15,18 @@ import java.io.File
 class ShizukuModRepository(private val manager: ShizukuManager) : ModRepository {
     override suspend fun stopGame() { withContext(Dispatchers.IO) { unwrap(manager.requireEngine().stopGame()) } }
     override suspend fun managedMods(): List<ManagedMod> = withContext(Dispatchers.IO) {
-        val array = JSONArray(unwrap(manager.requireEngine().managedMods()))
+        val response = ParcelFileDescriptor.AutoCloseInputStream(requireNotNull(manager.requireEngine().openManagedMods()))
+            .bufferedReader(Charsets.UTF_8).use { it.readText() }
+        val array = JSONArray(unwrap(response))
         (0 until array.length()).map { i -> array.getJSONObject(i).let {
+            val changes = it.optJSONArray("changes") ?: JSONArray()
             ManagedMod(it.getString("id"), it.getString("folder"), it.getBoolean("active"),
-                if (it.isNull("issue")) null else it.getString("issue"), it.optBoolean("shaMismatch", false))
+                if (it.isNull("issue")) null else it.getString("issue"), it.optBoolean("shaMismatch", false),
+                (0 until changes.length()).map { index -> changes.getJSONObject(index).let { change ->
+                    IntegrityChange(change.getString("path"), if (change.isNull("expected")) null else change.getString("expected"),
+                        if (change.isNull("actual")) null else change.getString("actual"))
+                } }, it.optLong("backupAt"), it.optLong("requiredBytes"), it.optLong("availableBytes"),
+                if (it.isNull("archiveSha256")) null else it.getString("archiveSha256"))
         } }
     }
     override fun storeMod(localZip: File, id: String, legacyTransactions: List<String>): Flow<EngineEvent> = channelFlow {
@@ -35,10 +43,33 @@ class ShizukuModRepository(private val manager: ShizukuManager) : ModRepository 
         withContext(Dispatchers.IO) { unwrap(manager.requireEngine().setModActive(id, active, progress)) }
         send(EngineEvent.Finished("updated"))
     }
+    override fun updateMod(localZip: File, id: String, expectedArchiveHash: String, manifest: String): Flow<EngineEvent> = channelFlow {
+        val progress = callback()
+        withContext(Dispatchers.IO) {
+            ParcelFileDescriptor.open(localZip, ParcelFileDescriptor.MODE_READ_ONLY).use {
+                unwrap(manager.requireEngine().updateMod(it, id, expectedArchiveHash, manifest, progress))
+            }
+        }
+        send(EngineEvent.Finished("updated"))
+    }
     override fun warningAction(id: String, recover: Boolean): Flow<EngineEvent> = channelFlow {
         val progress = callback()
         withContext(Dispatchers.IO) { unwrap(manager.requireEngine().warningAction(id, recover, progress)) }
         send(EngineEvent.Finished("updated"))
+    }
+    override fun overwriteMod(localZip: File, id: String, expectedArchiveHash: String, incomingHash: String,
+        developerMode: Boolean, publicationBaseUrl: String): Flow<EngineEvent> = channelFlow {
+        val progress = callback()
+        withContext(Dispatchers.IO) {
+            ParcelFileDescriptor.open(localZip, ParcelFileDescriptor.MODE_READ_ONLY).use {
+                unwrap(manager.requireEngine().overwriteMod(it, id, expectedArchiveHash, incomingHash,
+                    developerMode, publicationBaseUrl, progress))
+            }
+        }
+        send(EngineEvent.Finished("overwritten"))
+    }
+    override suspend fun writeDeveloperFiles(id: String, publicationBaseUrl: String) {
+        withContext(Dispatchers.IO) { unwrap(manager.requireEngine().writeDeveloperFiles(id, publicationBaseUrl)) }
     }
     override suspend fun deleteStoredMod(id: String) {
         withContext(Dispatchers.IO) { unwrap(manager.requireEngine().deleteStoredMod(id, null)) }
@@ -64,7 +95,14 @@ class ShizukuModRepository(private val manager: ShizukuManager) : ModRepository 
     }
     private fun unwrap(response: String): String {
         val envelope = JSONObject(response)
-        if (!envelope.getBoolean("ok")) throw EngineFailure(envelope.getInt("code"), envelope.getString("message"))
+        if (!envelope.getBoolean("ok")) {
+            val conflicts = envelope.optJSONArray("conflicts") ?: JSONArray()
+            throw EngineFailure(envelope.getInt("code"), envelope.getString("message"),
+                (0 until conflicts.length()).map { index -> conflicts.getJSONObject(index).let { conflict ->
+                    val files = conflict.getJSONArray("files")
+                    ModConflict(conflict.getString("name"), (0 until files.length()).map(files::getString))
+                } })
+        }
         return envelope.getString("value")
     }
     private fun ProducerScope<EngineEvent>.callback() = object : IProgress.Stub() {

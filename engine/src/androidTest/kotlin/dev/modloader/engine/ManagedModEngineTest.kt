@@ -36,6 +36,69 @@ class ManagedModEngineTest {
     }
     private fun active(storage: File): Boolean = JSONArray(ManagedModEngine(storage).list()).getJSONObject(0).getBoolean("active")
 
+    @Test fun storesMoreThan100ModsAndStillActivatesRestoresAndDeletes() = fixture { storage, bundles, zip ->
+        val engine = ManagedModEngine(storage)
+        val ids = (1..101).map { store(engine, zip) }
+        val listed = JSONArray(engine.list())
+        assertEquals(101, listed.length())
+        assertEquals(ids.toSet(), (0 until listed.length()).map { listed.getJSONObject(it).getString("id") }.toSet())
+        engine.setActive(ids.last(), true, noop)
+        assertEquals("UnityFSreplacement", File(bundles, "existing").readText())
+        engine.setActive(ids.last(), false, noop)
+        assertEquals("original", File(bundles, "existing").readText())
+        engine.delete(ids.last(), noop)
+        assertEquals(100, JSONArray(ManagedModEngine(storage).list()).length())
+    }
+
+    @Test fun corruptedRecordDoesNotHideHealthyModsOrAllowUnsafeWrites() = fixture { storage, bundles, zip ->
+        val engine = ManagedModEngine(storage)
+        val id = store(engine, zip)
+        val broken = File(bundles, "mods/broken").apply { mkdir() }
+        File(broken, "state.json").writeText("not json")
+        File(broken, "backup").mkdir()
+        File(broken, "backup/keep").writeText("saved")
+        val records = JSONArray(engine.list())
+        assertEquals(2, records.length())
+        assertTrue((0 until records.length()).any { records.getJSONObject(it).getString("id") == id })
+        assertTrue((0 until records.length()).any { records.getJSONObject(it).optString("issue") == "INVALID_RECORD" })
+        try { engine.setActive(id, true, noop); fail("Unknown conflicts must block writes") } catch (_: Exception) { }
+        assertEquals("original", File(bundles, "existing").readText())
+        assertEquals("saved", File(broken, "backup/keep").readText())
+    }
+
+    @Test fun mismatchReportsExactFilesHashesAndBackupDate() = fixture { storage, bundles, zip ->
+        val engine = ManagedModEngine(storage)
+        val id = store(engine, zip)
+        val initial = JSONArray(engine.list()).getJSONObject(0)
+        assertTrue(initial.getLong("requiredBytes") > zip.length())
+        assertTrue(initial.getLong("availableBytes") > 0)
+        engine.setActive(id, true, noop)
+        val expected = SafeFs.hash(File(bundles, "existing"))
+        File(bundles, "existing").writeText("updated")
+        val summary = JSONArray(engine.list()).getJSONObject(0)
+        assertTrue(summary.getLong("backupAt") > 0)
+        val change = summary.getJSONArray("changes").getJSONObject(0)
+        assertEquals("existing", change.getString("path"))
+        assertEquals(expected, change.getString("expected"))
+        assertEquals(SafeFs.hash(File(bundles, "existing")), change.getString("actual"))
+        File(bundles, "existing").delete()
+        assertTrue(JSONArray(engine.list()).getJSONObject(0).getJSONArray("changes").getJSONObject(0).isNull("actual"))
+    }
+
+    @Test fun listingWithUnknownRecordDoesNotResumeInterruptedWrites() = fixture { storage, bundles, zip ->
+        val engine = ManagedModEngine(storage)
+        val id = store(engine, zip)
+        val interrupted = ManagedModEngine(storage, checkpoint = { if (it == "RENAMED:0") throw Death() })
+        try { interrupted.setActive(id, true, noop); fail("Death expected") } catch (_: Death) { }
+        val before = File(bundles, "existing").readText()
+        File(bundles, "mods/broken").mkdir()
+        File(bundles, "mods/broken/state.json").writeText("broken")
+        val summaries = JSONArray(engine.list())
+        assertEquals(2, summaries.length())
+        assertEquals(before, File(bundles, "existing").readText())
+        assertTrue(File(bundles, "mods/test/backup").isDirectory)
+    }
+
     @Test fun missingGameDataIsReportedWithoutCreatingGameDirectories() {
         val storage = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, UUID.randomUUID().toString()).apply { mkdir() }
         try {

@@ -10,6 +10,10 @@ The app is written in Kotlin with Jetpack Compose and uses a Shizuku user servic
 
 [Download the latest release](https://github.com/Kohlrabenschwarz/Mod-Loader/releases/latest) · [Read the user agreement](TERMS.md) · [Create a mod package](examples/TEMPLATE.md) · [Open in Android Studio](ANDROID_STUDIO.md)
 
+**Looking for more help?**
+
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/dUcABJtzpJ)
+
 ## Please read this before using the app
 
 Mod Loader is an independent file-management tool. It is not affiliated with, approved by, sponsored by, or supported by Nekki Limited or Banzai Games.
@@ -22,16 +26,21 @@ Read the complete [User Agreement and Risk Notice](TERMS.md). The same agreement
 
 ## What the app can do
 
+- **Search your library.** Search names, creators, descriptions, versions, folders, and affected filenames. Search ignores letter case and accents, including Turkish I variants. Clear the search to return to the full library. Imported mod count has no fixed cap; available storage and device resources determine practical capacity. Large library responses use a file-descriptor stream rather than a single Binder string.
 - **Keep a visual mod library.** Imported mods appear as cards with an icon, name, creator, version, description, affected-file count, and active state.
+- **Import from a file or link.** Tap **+** to open two round options. Select a local ZIP or enter a direct public HTTPS ZIP URL. Both paths validate the package and ask for approval when a name or mod ID matches an existing card.
+- **Replace an imported package with approval.** Choose which matching card to overwrite. A different package restores the old active mod first, preserves the card identity and previous stored archive, and leaves the replacement inactive.
+- **Prepare releases in Dev Mode.** Settings accepts a publication root URL. Each stored mod gets `.dev/latest.json`, ZIP size/SHA-256 values, per-file checksums, and metadata templates. Separate mod-ID publication directories prevent manifests from colliding. Incomplete metadata produces a draft; see the [developer/test guide](docs/MOD_UPDATE_TEST_TR.md).
 - **Import extensionless Unity bundles.** Payload filenames are preserved exactly. A `.bundle` extension is neither required nor added.
 - **Show every target before activation.** The confirmation screen lists the complete set of files a mod will affect.
 - **Activate and deactivate safely.** Original game files are backed up before replacement. Files introduced by a mod are removed when that mod is disabled.
 - **Recover interrupted work.** Transaction journals allow the engine to continue recovery after a disconnect, crash, or process restart.
-- **Detect outside changes.** SHA-256 records track both the original and modified versions of every affected file. A warning appears if a game update or another tool changes them.
+- **Inspect outside changes.** SHA-256 records track both the original and modified versions of every affected file. Warnings list changed paths, expected/current hashes, and the recorded backup date when available.
 - **Offer deliberate warning actions.** From the warning panel you can recover saved base files, delete the stored mod and its backups while leaving current game files alone, or hide the warning without disabling integrity checks.
-- **Prevent active-mod conflicts.** Two active mods cannot manage the same destination file at the same time.
+- **Explain active-mod conflicts.** Activation lists the conflicting mod names and shared files before making changes. Two active mods cannot manage the same destination file at the same time.
 - **Launch the game.** The Play button stops the existing game process through the supported Shizuku service when available, then opens the game using Android’s normal launcher intent.
 - **Check for app updates.** Stable GitHub releases are checked at startup. Downloads open in the browser and installation remains under the user’s control.
+- **Update individual mods.** Packages with optional `update.json` metadata offer manual update checks. New ZIPs must match the manifest's SHA-256, size, identity and version. Active mods are restored first; replacements keep the same card and stay inactive, with the prior archive and backups retained. See [mod updates](docs/MOD_UPDATES.md).
 - **Adapt to the user.** The interface supports English, Turkish, German, Hindi, Russian, and Simplified Chinese, plus light/dark mode and six accent colors.
 
 ## Requirements
@@ -56,13 +65,15 @@ Mod Loader does not patch the game APK, inject native code into the game process
 
 1. Download the latest  APK from GitHub Release.
 2. Verify the SHA-256 checksum shown in that release if you want to confirm the download.
-3. Install and start Shizuku, then open Mod Loader. The app attempts to connect up to three times and shows a green status card when it is ready.
+3. Install and start Shizuku, then open Mod Loader. The app attempts to connect up to three times and shows a green status card when it is ready. If Shizuku starts later, the app reconnects automatically; a failed connection also offers a retry action. Permission denials and unsupported backends have separate explanations.
 4. Read the agreement. You can change its language before accepting it.
-5. Tap the round **+** button to choose a mod ZIP.
+5. Tap the round **+** button and choose **Add from file** or **Add from link**. Links must download a public HTTPS ZIP directly.
 6. Review the mod card and affected-file list. Enable the switch only when you trust the source and understand the targets.
 7. Use the **Play** button to restart and open the game after changing mods.
 
-Tap a mod card to expand its information. Hold the card to open recovery and deletion actions. Settings contains language, appearance, update, and agreement options.
+Activation estimates the additional free space needed for staging, verified originals, and rollback. Progress names each processing phase and shows copied bytes where available. A damaged cached ZIP gets its own card and can be restored from a verified stored archive or imported again; other readable mods stay visible. Corrupt privileged state blocks changes until repaired, preserving its backups.
+
+Tap a mod card to expand its information and mod update controls. Hold the card to open recovery and deletion actions. Settings contains language, appearance, app update, Dev Mode, and agreement options.
 
 If the game is missing or has not created its data directory yet, install it, open it, finish its data download, and try again. A red Shizuku card means the privileged connection or permission is unavailable.
 
@@ -79,6 +90,8 @@ Bundles/
         ├── <mod-name>.zip
         ├── state.json
         ├── sha.json
+        ├── .dev/                 # optional publishing files, outside the ZIP
+        ├── previous/             # one prior stored version after replacement
         └── backup/
             └── <transaction-id>/
                 ├── journal.json
@@ -99,7 +112,7 @@ When a mismatch is found, the app leaves the current files alone and shows a war
 
 - **Recover base files** restores verified originals. Because those backups may predate a game update, the current files are preserved under `before-recovery/` first.
 - **Delete** removes the archived mod and its backups while leaving the game’s current files unchanged.
-- **Ignore this warning** hides the message for the selected duration. Integrity checking continues, and holding the card opens the warning again.
+- **Ignore this warning** hides only the currently observed set of changes. A different hash, missing file, or additional changed file produces a new warning even after choosing not to show the old one again. Integrity checking continues, and holding the card opens the warning again.
 
 Editing `sha.json` does not grant permission to replace arbitrary files. The transaction journal and fixed target policy remain authoritative.
 
@@ -118,7 +131,7 @@ my-mod.zip
 
 Every payload file must begin with the seven ASCII bytes `UnityFS` (`55 6E 69 74 79 46 53`). `affectedFiles` in `info.json` must exactly match the payload. Metadata and icons are displayed in the library and are never copied into the game’s bundle directory.
 
-The loader rejects traversal, absolute paths, symlinks, special files, hidden or reserved targets, Unicode control and bidirectional-formatting characters, normalization ambiguity, case collisions, encrypted entries, ZIP64 archives, compression bombs, and mismatched manifests. Limits are 256 MiB for the ZIP, 256 MiB per payload file, 512 MiB expanded total, 200 entries, a 200:1 compression ratio, a 4 MiB icon, and 2048 × 2048 icon dimensions.
+The loader rejects traversal, absolute paths, symlinks, special files, hidden or reserved targets, Unicode control and bidirectional-formatting characters, normalization ambiguity, case collisions, encrypted entries, ZIP64 archives, compression bombs, and mismatched manifests. Limits are 1 GiB for the ZIP, 512 MiB per payload file, 2 GiB expanded total, 200 entries, a 200:1 compression ratio, a 4 MiB icon, and 2048 × 2048 icon dimensions.
 
 These checks protect the loader’s file boundary. A valid `UnityFS` header does not prove that Unity can safely parse the bundle or that it matches the installed game version.
 
@@ -129,6 +142,8 @@ Start with the [generic test ZIP](examples/generic-mod-template.zip) and read th
 The app checks the public GitHub API for the latest stable release from `Kohlrabenschwarz/Mod-Loader`. It accepts only tags shaped like `vMAJOR.MINOR.PATCH` with an asset named `Mod-Loader-vMAJOR.MINOR.PATCH-release.apk`. Drafts, prereleases, malformed versions, and external asset links are ignored.
 
 The request contains no mod content, game files, device identifiers, accounts, analytics, or telemetry. GitHub still receives ordinary connection information such as the requesting IP address. Update-check failures never block local mod management. The app does not request silent-install permission.
+
+Individual mod updates contact the public HTTPS source specified in that mod's `update.json` only when requested from its card. That source receives ordinary connection information, including the IP address. SHA-256 checks the ZIP against its manifest; signed publisher authentication is not included. Read the [mod update guide](docs/MOD_UPDATES.md) for the format and replacement/recovery behavior.
 
 The header shows the application name, installed version, and SHA-256 of the installed base APK. This checksum identifies the APK bytes; it is different from the signing-certificate fingerprint.
 
@@ -149,10 +164,12 @@ Use JDK 17 or 21 and Android SDK Platform 35. Open the repository root in Androi
 
 ```sh
 ./gradlew :domain:test :app:assembleDebug :app:lintDebug
-./gradlew :engine:assembleDebugAndroidTest
+./gradlew :engine:connectedDebugAndroidTest :app:connectedDebugAndroidTest
+./gradlew :engine:pixel2Api30DebugAndroidTest :app:pixel2Api30DebugAndroidTest
+./gradlew :engine:pixel2Api35DebugAndroidTest :app:pixel2Api35DebugAndroidTest
 ```
 
-On Windows, use `gradlew.bat`. Privileged instrumentation tests should run only on an isolated Android device or emulator. The release signing key and passwords are deliberately kept outside the repository.
+On Windows, use `gradlew.bat`. The CI workflow runs isolated engine, library, and UI instrumentation tests on Android 11/API 30 and Android 15/API 35. The fixtures operate in test-owned directories and do not require the game or a live Shizuku service. Real Shizuku and game integration still require separate device validation. The release signing key and passwords are deliberately kept outside the repository.
 
 Helpful guides:
 

@@ -13,5 +13,9 @@ interface IFileEngine {
     ParcelFileDescriptor openStoredMod(String id) = 8;
     String stopGame() = 9;
     String warningAction(String id, boolean recover, IProgress progress) = 10;
+    ParcelFileDescriptor openManagedMods() = 11;
+    String updateMod(in ParcelFileDescriptor zip, String id, String expectedArchiveHash, String manifest, IProgress progress) = 12;
+    String overwriteMod(in ParcelFileDescriptor zip, String id, String expectedArchiveHash, String incomingHash, boolean developerMode, String publicationBaseUrl, IProgress progress) = 13;
+    String writeDeveloperFiles(String id, String publicationBaseUrl) = 14;
     void destroy() = 16777114;
 }

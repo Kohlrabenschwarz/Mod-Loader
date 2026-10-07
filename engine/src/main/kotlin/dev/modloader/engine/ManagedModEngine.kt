@@ -32,11 +32,13 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
                     validId(it.removePrefix(".deleted-").removePrefix(".incoming-"))
                     SafeFs.removeTree(home, it)
                 }
+                ModArchiveUpdate.recover(home, ::validateUpdateDirectory)
                 block(home)
         }
     }
     private data class Record(val dir: File, val json: JSONObject) {
         var shaMismatch: Boolean = false
+        var changes: List<IntegrityChange> = emptyList()
         val id get() = json.getString("id")
         val folder get() = json.getString("folder")
         val files: List<ModFile> get() {
@@ -54,12 +56,12 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
         val archive get() = SafeFs.checked(dir, "$folder.zip")
     }
     private fun save(record: Record) = SafeFs.writeAtomic(SafeFs.checked(record.dir, "state.json"), record.json.toString())
-    private fun read(dir: File): Record {
-        ModFolderPolicy.validate(dir.name)
+    private fun read(dir: File, expectedFolder: String = dir.name): Record {
+        ModFolderPolicy.validate(expectedFolder)
         val file = SafeFs.checked(dir, "state.json")
         check(file.isFile && file.length() in 1..256L * 1024) { "Mod kaydı bozuk" }
         val record = Record(dir, JSONObject(SafeFs.readText(file)))
-        check(record.json.getInt("schema") == 1 && record.folder == dir.name)
+        check(record.json.getInt("schema") == 1 && record.folder == expectedFolder)
         validId(record.id)
         require(record.transactions.size <= 20); record.transactions.forEach(::validId)
         require(record.files.size in 1..Limits.ENTRIES)
@@ -74,12 +76,11 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
     }
     private fun records(home: File): List<Record> {
         val names = home.list() ?: error("mods klasörü okunamadı")
-        require(names.size <= 100) { "mods klasörü sınırı aşıldı" }
         val result = names.filterNot { it.startsWith('.') }.mapNotNull { name ->
             val dir = SafeFs.checked(home, name)
             if (dir.isDirectory && SafeFs.checked(dir, "state.json").exists()) read(dir) else null
         }
-        require(result.size <= 20 && result.map { it.id }.distinct().size == result.size)
+        require(result.map { it.id }.distinct().size == result.size)
         return result
     }
     private fun find(home: File, id: String): Record = records(home).firstOrNull { it.id == validId(id) } ?: error("Mod kaydı bulunamadı")
@@ -140,7 +141,7 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
         check(entries.length() == record.files.size)
         val expectedFiles = record.files.associateBy { it.path }
         val seen = hashSetOf<String>()
-        var mismatch = false
+        val changes = mutableListOf<IntegrityChange>()
         for (i in 0 until entries.length()) {
             val entry = entries.getJSONObject(i)
             val path = entry.getString("path")
@@ -151,25 +152,65 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
             val expected = if (record.active) expectedFile.sha256 else original
             val target = SafeFs.checked(root, path)
             // Aşırı büyüyen ya da dosya yerine dizin olan hedef de değişikliktir; okuma izni hatası ise issue kalır.
-            if (target.exists() && (!target.isFile || target.length() > Limits.TOTAL_BYTES)) mismatch = true
-            else if (SafeFs.hash(target) != expected) mismatch = true
+            val actual = if (target.exists() && (!target.isFile || target.length() > Limits.TOTAL_BYTES)) "unreadable"
+                else SafeFs.hash(target)
+            if (actual != expected) changes.add(IntegrityChange(path.removePrefix(GameTarget.RELATIVE_RESOURCES + "/"), expected, actual))
         }
         val serialized = document.toString()
         if (serialized != previous) SafeFs.writeAtomic(file, serialized)
-        record.shaMismatch = mismatch
-        return mismatch
+        record.changes = changes
+        record.shaMismatch = changes.isNotEmpty()
+        return record.shaMismatch
     }
     private fun summary(record: Record, issue: String? = null) = JSONObject().apply {
         put("id", record.id); put("folder", record.folder); put("active", record.active)
+        put("archiveSha256", record.json.getString("archiveHash"))
         put("issue", issue ?: JSONObject.NULL)
         put("shaMismatch", record.shaMismatch)
+        put("changes", JSONArray().apply { record.changes.forEach { change -> put(JSONObject().apply {
+            put("path", change.path); put("expected", change.expected ?: JSONObject.NULL); put("actual", change.actual ?: JSONObject.NULL)
+        }) } })
+        val backupAt = record.json.optLong("backupAt", 0)
+        put("backupAt", backupAt)
+        val originals = record.files.map { SafeFs.checked(root, it.path).let { f -> if (f.isFile) f.length() else 0L } }
+        val payload = record.files.sumOf { it.size }
+        // Additional free space at peak: ZIP + staging, or staging + originals + rollback reserve.
+        put("requiredBytes", maxOf(record.archive.length() + payload,
+            payload + originals.sum() + (originals.maxOrNull() ?: 0L)) + Limits.RESERVE_BYTES)
+        put("availableBytes", record.dir.usableSpace)
     }
     fun list(): String = locked { home ->
         JSONArray().apply {
-            records(home).forEach { record ->
-                var issue: String? = null
-                try { reconcile(record); checkSha(record) } catch (e: Exception) { issue = (e.message ?: "Recovery required").take(500) }
-                put(summary(record, issue))
+            val names = home.list() ?: error("mods klasörü okunamadı")
+            val readable = mutableListOf<Record>()
+            var invalidRecord = false
+            names.filterNot { it.startsWith('.') }.forEach { name ->
+                val dir = SafeFs.checked(home, name)
+                if (!dir.isDirectory || !SafeFs.checked(dir, "state.json").exists()) return@forEach
+                val record = try { read(dir) } catch (_: Exception) {
+                    invalidRecord = true
+                    // Listing is tolerant; mutations still use strict records() and cannot bypass unknown conflicts.
+                    put(JSONObject().apply {
+                        put("id", UUID.nameUUIDFromBytes(name.toByteArray(Charsets.UTF_8)).toString())
+                        put("folder", name); put("active", false); put("issue", "INVALID_RECORD")
+                        put("shaMismatch", false)
+                    })
+                    return@forEach
+                }
+                readable.add(record)
+            }
+            require(readable.map { it.id }.distinct().size == readable.size)
+            readable.forEach { record ->
+                var issue: String? = if (invalidRecord) "INVALID_LIBRARY" else null
+                try {
+                    // Unknown state may overlap a pending transaction: listing must not resume writes in that case.
+                    if (!invalidRecord) reconcile(record)
+                    checkSha(record)
+                } catch (e: Exception) { issue = (e.message ?: "Recovery required").take(500) }
+                try { put(summary(record, issue)) } catch (_: Exception) {
+                    put(JSONObject().put("id", record.id).put("folder", record.folder).put("active", record.active)
+                        .put("issue", "INVALID_RECORD").put("shaMismatch", record.shaMismatch))
+                }
             }
         }.toString()
     }
@@ -177,14 +218,13 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
     fun store(fd: ParcelFileDescriptor, id: String, legacyJson: String, progress: (String, Long, Long) -> Unit): String = locked { home ->
         validId(id)
         records(home).firstOrNull { it.id == id }?.let { reconcile(it); return@locked summary(it).toString() }
-        check(records(home).size < 20) { "En fazla 20 mod saklanabilir" }
         require(legacyJson.length <= 2048)
         val legacyArray = JSONArray(legacyJson)
         require(legacyArray.length() <= 20)
         val legacy = (0 until legacyArray.length()).map { validId(legacyArray.getString(it)) }.distinct()
         val stat = Os.fstat(fd.fileDescriptor)
         require(OsConstants.S_ISREG(stat.st_mode) && stat.st_size in 1..Limits.ZIP_BYTES)
-        check(home.usableSpace >= stat.st_size + Limits.RESERVE_BYTES) { "Mod arşivi için alan yok" }
+        if (home.usableSpace < stat.st_size + Limits.RESERVE_BYTES) throw EngineFailure(2, "NO_ARCHIVE_SPACE")
         val incomingName = ".incoming-$id"
         SafeFs.removeTree(home, incomingName)
         val incoming = SafeFs.checked(home, incomingName).also(SafeFs::mkdir)
@@ -223,6 +263,136 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
         } finally { SafeFs.removeTree(home, incomingName) }
     }
 
+    private fun validateUpdateDirectory(dir: File, folder: String, id: String, hash: String) {
+        val record = read(dir, folder)
+        check(record.id == id && !record.active && record.json.getString("archiveHash") == hash)
+        check(SafeFs.hash(record.archive) == hash) { "Update archive changed" }
+    }
+
+    fun update(fd: ParcelFileDescriptor, id: String, expectedArchiveHash: String, manifest: String,
+        progress: (String, Long, Long) -> Unit): String = locked { home ->
+        val release = ModUpdateJson.release(manifest)
+        ModUpdatePolicy.sha256(expectedArchiveHash)
+        val record = find(home, id)
+        reconcile(record)
+        val currentHash = record.json.getString("archiveHash")
+        // A reply lost after publication must not deactivate or replace a successfully updated mod again.
+        if (currentHash == release.zipSha256) {
+            check(SafeFs.hash(record.archive) == currentHash)
+            checkSha(record)
+            return@locked summary(record).toString()
+        }
+        if (currentHash != expectedArchiveHash) throw EngineFailure(16, "UPDATE_PREVIEW_STALE")
+        if (checkSha(record)) throw EngineFailure(7, "SHA_MISMATCH")
+        check(SafeFs.hash(record.archive) == currentHash) { "Stored archive changed" }
+        val previousMetadata = ModMetadataReader.read(record.archive)
+        val source = previousMetadata.update ?: throw EngineFailure(16, "UPDATE_SOURCE_MISSING")
+        if (source.modId != release.modId || release.versionCode <= requireNotNull(previousMetadata.versionCode))
+            throw EngineFailure(16, "UPDATE_IDENTITY_OR_VERSION")
+        replaceArchive(home, record, fd, release.zipSha256, release.zipSize, null, progress) { metadata ->
+            if (metadata.modId != release.modId || metadata.versionCode != release.versionCode ||
+                metadata.version != release.version || metadata.update != source)
+                throw EngineFailure(16, "UPDATE_PACKAGE_MISMATCH")
+        }
+    }
+
+    fun overwrite(fd: ParcelFileDescriptor, id: String, expectedArchiveHash: String, incomingHash: String,
+        developerMode: Boolean, publicationBaseUrl: String, progress: (String, Long, Long) -> Unit): String = locked { home ->
+        ModUpdatePolicy.sha256(expectedArchiveHash); ModUpdatePolicy.sha256(incomingHash)
+        val base = if (developerMode) DeveloperPublicationPolicy.baseUrl(publicationBaseUrl) else null
+        val record = find(home, id)
+        reconcile(record)
+        val currentHash = record.json.getString("archiveHash")
+        check(SafeFs.hash(record.archive) == currentHash) { "Stored archive changed" }
+        if (currentHash == incomingHash) {
+            // Same bytes or a lost successful reply: never replace an already published version twice.
+            if (base != null) writeDeveloperFiles(record, base)
+            checkSha(record)
+            return@locked summary(record).toString()
+        }
+        if (currentHash != expectedArchiveHash) throw EngineFailure(16, "OVERWRITE_PREVIEW_STALE")
+        if (checkSha(record)) throw EngineFailure(7, "SHA_MISMATCH")
+        val previous = ModMetadataReader.read(record.archive)
+        replaceArchive(home, record, fd, incomingHash, null, base, progress) { incoming ->
+            if (!ModImportPolicy.collides(incoming.name, incoming.modId, previous.name, previous.modId))
+                throw EngineFailure(16, "OVERWRITE_IDENTITY_MISMATCH")
+        }
+    }
+
+    fun writeDeveloperFiles(id: String, publicationBaseUrl: String): String = locked { home ->
+        val record = find(home, id)
+        writeDeveloperFiles(record, publicationBaseUrl)
+        "Generated"
+    }
+    private fun writeDeveloperFiles(record: Record, publicationBaseUrl: String) {
+        val hash = record.json.getString("archiveHash")
+        check(SafeFs.hash(record.archive) == hash) { "Stored archive changed" }
+        ModDeveloperFiles.write(record.dir, record.id, record.archive, ModMetadataReader.read(record.archive),
+            record.files, hash, publicationBaseUrl)
+    }
+
+    /** Both approved imports and network updates use the same recoverable directory exchange. */
+    private fun replaceArchive(home: File, record: Record, fd: ParcelFileDescriptor, incomingHash: String,
+        expectedSize: Long?, developerBaseUrl: String?, progress: (String, Long, Long) -> Unit,
+        validateMetadata: (ModMetadata) -> Unit): String {
+        val stat = Os.fstat(fd.fileDescriptor)
+        require(OsConstants.S_ISREG(stat.st_mode) && stat.st_size in 1..Limits.ZIP_BYTES)
+        if (expectedSize != null && stat.st_size != expectedSize) throw EngineFailure(14, "UPDATE_SIZE_MISMATCH")
+        val size = stat.st_size
+        if (home.usableSpace < size + Limits.RESERVE_BYTES) throw EngineFailure(2, "NO_ARCHIVE_SPACE")
+        val currentHash = record.json.getString("archiveHash")
+        val operationName = ".update-${record.id}"
+        val operation = SafeFs.checked(home, operationName).also(SafeFs::mkdir)
+        val incoming = SafeFs.checked(operation, "new").also(SafeFs::mkdir)
+        val journal = SafeFs.checked(operation, "journal.json")
+        try {
+            val archive = SafeFs.checked(incoming, "${record.folder}.zip")
+            var done = 0L
+            ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(fd.fileDescriptor)).use { input ->
+                SafeFs.copy(input, archive, size) { n -> done += n; progress("Mod arşivleniyor", done, size) }
+            }
+            if (archive.length() != size || SafeFs.hash(archive) != incomingHash)
+                throw EngineFailure(14, "UPDATE_HASH_MISMATCH")
+            val metadata = ModMetadataReader.read(archive)
+            validateMetadata(metadata)
+            val verify = SafeFs.checked(incoming, "verify").also(SafeFs::mkdir)
+            val files = ZipModParser().extract(archive, pkg, verify) { n, total -> progress("Mod doğrulanıyor", n, total) }
+            SafeFs.removeTree(incoming, "verify")
+            val newPaths = files.map { it.path.lowercase(Locale.ROOT) }.toSet()
+            records(home).filter { it.id != record.id }.forEach { other ->
+                reconcile(other)
+                if (other.active && other.files.any { it.path.lowercase(Locale.ROOT) in newPaths })
+                    throw conflict(other, newPaths)
+            }
+            if (developerBaseUrl != null)
+                ModDeveloperFiles.write(incoming, record.id, archive, metadata, files, incomingHash, developerBaseUrl)
+            checkpoint("UPDATE_VERIFIED")
+            toggle(home, record, false, progress)
+            if (checkSha(record)) throw EngineFailure(7, "SHA_MISMATCH")
+            val data = JSONObject().apply {
+                put("schema", 1); put("id", record.id); put("folder", record.folder); put("name", metadata.name)
+                put("active", false); put("transactions", JSONArray()); put("archiveHash", incomingHash)
+                put("files", JSONArray().apply { files.forEach { f -> put(JSONObject().apply {
+                    put("path", f.path); put("size", f.size); put("sha256", f.sha256)
+                }) } })
+            }
+            SafeFs.writeAtomic(SafeFs.checked(incoming, "state.json"), data.toString())
+            SafeFs.mkdir(SafeFs.checked(incoming, "backup"))
+            checkSha(read(incoming, record.folder))
+            SafeFs.writeAtomic(journal, JSONObject().apply {
+                put("schema", 1); put("id", record.id); put("folder", record.folder)
+                put("oldHash", currentHash); put("newHash", incomingHash)
+            }.toString())
+            checkpoint("UPDATE_READY")
+            ModArchiveUpdate.recover(home, ::validateUpdateDirectory, checkpoint)
+            val updated = find(home, record.id)
+            checkSha(updated)
+            return summary(updated).toString()
+        } finally {
+            if (operation.exists() && !journal.exists()) SafeFs.removeTree(home, operationName)
+        }
+    }
+
     private fun toggle(home: File, record: Record, enabled: Boolean, progress: (String, Long, Long) -> Unit) {
         reconcile(record)
         if (record.active == enabled) return
@@ -232,7 +402,7 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
             records(home).filter { it.id != record.id }.forEach { other ->
                 reconcile(other)
                 if (other.active && other.files.any { it.path.lowercase(Locale.ROOT) in paths })
-                    throw EngineFailure(8, "MOD_CONFLICT")
+                    throw conflict(other, paths)
             }
             check(SafeFs.hash(record.archive) == record.json.getString("archiveHash")) { "Saklanan ZIP değişmiş" }
             // Önceki aktivasyon geri alınmıştır. Yeni aktivasyon kendi orijinallerini yedekler.
@@ -243,7 +413,9 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
                 JSONObject(txEngine.prepare(it, pkg, progress))
             }
             val txId = prepared.getString("id")
-            record.transactions = listOf(txId); save(record) // Apply'dan önce kalıcı bağ.
+            record.transactions = listOf(txId)
+            record.json.put("backupAt", System.currentTimeMillis())
+            save(record) // Apply'dan önce kalıcı bağ.
             checkpoint("MOD_LINKED")
             txEngine.apply(pkg, txId, true, progress)
             checkpoint("MOD_COMMITTED")
@@ -258,13 +430,17 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
             records(home).filter { it.id != record.id }.forEach { other ->
                 reconcile(other)
                 if (other.active && other.files.any { it.path.lowercase(Locale.ROOT) in paths } && lastCommit(other) >= lastCommit(record))
-                    throw EngineFailure(8, "MOD_CONFLICT")
+                    throw conflict(other, paths)
             }
             record.transactions.asReversed().forEach { engine(record).restore(pkg, it, progress) }
             checkpoint("MOD_RESTORED")
             record.active = false; save(record)
         }
     }
+    private fun conflict(other: Record, paths: Set<String>) = EngineFailure(8, "MOD_CONFLICT", listOf(ModConflict(
+        try { UntrustedTextPolicy.display(other.json.getString("name"), 100) } catch (_: Exception) { other.folder },
+        other.files.filter { it.path.lowercase(Locale.ROOT) in paths }
+            .map { it.path.removePrefix(GameTarget.RELATIVE_RESOURCES + "/") })))
     fun setActive(id: String, enabled: Boolean, progress: (String, Long, Long) -> Unit): String = locked { home ->
         val record = find(home, id)
         toggle(home, record, enabled, progress)
@@ -289,7 +465,7 @@ internal class ManagedModEngine(private val storage: File, private val beforeMut
             val paths = record.files.map { it.path.lowercase(Locale.ROOT) }.toSet()
             records(home).filter { it.id != id }.forEach { other ->
                 reconcile(other)
-                if (other.active && other.files.any { it.path.lowercase(Locale.ROOT) in paths }) throw EngineFailure(8, "MOD_CONFLICT")
+                if (other.active && other.files.any { it.path.lowercase(Locale.ROOT) in paths }) throw conflict(other, paths)
             }
             if (record.transactions.isEmpty()) throw EngineFailure(11, "NO_BASE_BACKUP")
             record.transactions.asReversed().forEach { engine(record).restoreBase(pkg, it, progress) }

@@ -60,7 +60,7 @@ internal class TransactionEngine(private val storage: File, private val vaultRel
         check((vault.listFiles()?.count { it.isDirectory } ?: 0) < 20) { "20 işlem saklanıyor; doğrulanmış yedekleri dışa aktararak arşivi temizleyin" }
         val stat = Os.fstat(fd.fileDescriptor)
         require(OsConstants.S_ISREG(stat.st_mode) && stat.st_size in 1..Limits.ZIP_BYTES) { "Yerel, sınırlı ZIP FD gerekli" }
-        check(vault.usableSpace > stat.st_size + Limits.RESERVE_BYTES) { "ZIP için yetersiz alan" }
+        if (vault.usableSpace <= stat.st_size + Limits.RESERVE_BYTES) throw EngineFailure(2, "NO_ARCHIVE_SPACE")
         val dir = tx(vault, UUID.randomUUID().toString()).also(SafeFs::mkdir)
         val zip = SafeFs.checked(dir, "package.zip")
         // APK sandbox yolunu shell'e vermek yerine FD aktarılır.
@@ -112,7 +112,7 @@ internal class TransactionEngine(private val storage: File, private val vaultRel
             progress("Uygulama öncesi doğrulama", index + 1L, entries.size.toLong())
         }
         check(backupBytes <= Limits.TOTAL_BYTES) { "Yedek toplam boyutu sınırı aşıldı" }
-        check(vault.usableSpace >= backupBytes + largest + Limits.RESERVE_BYTES) { "Yedek ve geri alma için yetersiz alan" }
+        if (vault.usableSpace < backupBytes + largest + Limits.RESERVE_BYTES) throw EngineFailure(2, "NO_BACKUP_SPACE")
         journal.state = "BACKING_UP"; save(dir, journal)
         try {
             var backedUp = 0L

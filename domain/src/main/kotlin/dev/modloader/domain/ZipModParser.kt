@@ -23,7 +23,7 @@ class ZipModParser {
                 "Android/data/$pkg/files/", "Android/data/$pkg/files/gamedata/", "$pkg/files/", "$pkg/files/gamedata/")
             val mapped = entries.filterNot { entry ->
                 // Sunum dosyaları oyuna kopyalanmaz; MetadataReader ayrıca doğrular.
-                if (!entry.isDirectory && entry.name in setOf("info.json", "icon.png", "icon.jpg", "icon.webp")) return@filterNot true
+                if (!entry.isDirectory && entry.name in ModPackageFiles.metadata) return@filterNot true
                 (entry.isDirectory && entry.name in wrapperDirs).also { wrapper ->
                     if (wrapper) require(entry.size == 0L) { "Veri içeren dizin girdisi" }
                 }
@@ -52,7 +52,7 @@ class ZipModParser {
             }
             val total = mapped.filterNot { it.first.isDirectory }.sumOf { it.first.size }
             require(total <= Limits.TOTAL_BYTES) { "Açılan toplam boyut sınırı aşıldı" }
-            require(stage.usableSpace >= total + Limits.RESERVE_BYTES) { "Staging için yetersiz alan" }
+            if (stage.usableSpace < total + Limits.RESERVE_BYTES) throw EngineFailure(2, "NO_STAGING_SPACE")
             var done = 0L
             val files = mapped.filterNot { it.first.isDirectory }.map { (entry, path) ->
                 val out = File(stage, path)

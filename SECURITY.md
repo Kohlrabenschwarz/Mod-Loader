@@ -23,6 +23,10 @@ If a public issue is sufficient, ordinary crashes, translation mistakes, and com
 - The Shizuku user service accepts calls only from the owning application UID, only on Android's primary user, and only when running as ADB shell UID 2000. Root/Sui mode is intentionally rejected.
 - The application does not execute commands from mod metadata or filenames. The only privileged process command has fixed arguments and stops the fixed game package.
 - Updates are discovered through a fixed HTTPS GitHub API endpoint and open only the canonical release asset URL. Android's package installer must verify that an update has the same application ID and signing certificate.
+- Individual mod updates use the source explicitly declared in the imported package. Downloads require public HTTPS endpoints, bounded redirects and response sizes, and exact ZIP SHA-256/length. Package identity, increasing versionCode, and source continuity are rechecked in the privileged service. Hash verification does not authenticate a publisher or prevent compromise of both the manifest and ZIP. Signed manifests are not implemented. DNS screening is not a complete defense against DNS rebinding.
+- Initial ZIP-link imports use the same public HTTPS/redirect boundary, cap streamed bytes even without Content-Length, reject incomplete responses, and validate the archive before publishing it to the library. There is no separately supplied expected hash for an initial link import; the downloaded archive hash is recorded after validation.
+- Name/mod-ID import collisions require explicit UI approval. Replacement verifies the selected old archive and pending package hashes before restoring an active mod, and uses the recoverable directory exchange. Manual approved imports may use the same version; network updates still require an increasing versionCode.
+- Dev Mode writes publishing sidecars outside the ZIP under `.dev`. These files are not game payloads or recovery authority. Incomplete/mismatched metadata is marked as a draft in the generated checksum summary.
 
 ## Remaining limitations
 

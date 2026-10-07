@@ -57,7 +57,12 @@ class PrivilegedFileService @Keep constructor(context: Context) : IFileEngine.St
             }
             // ServiceSpecificException public Android SDK parçası değildir; taşınabilir hata zarfı.
             return JSONObject().put("ok", false).put("code", code)
-                .put("message", (e.message ?: e.javaClass.simpleName).take(600)).toString()
+                .put("message", (e.message ?: e.javaClass.simpleName).take(600))
+                .put("conflicts", org.json.JSONArray().apply {
+                    (e as? dev.modloader.domain.EngineFailure)?.conflicts?.forEach { conflict ->
+                        put(JSONObject().put("name", conflict.name).put("files", org.json.JSONArray(conflict.files)))
+                    }
+                }).toString()
         }
         // OutOfMemoryError/VM ölümü yakalanıp sahte başarı üretilmez. Journal sonraki bağlantıda kullanılır.
     }
@@ -75,11 +80,19 @@ class PrivilegedFileService @Keep constructor(context: Context) : IFileEngine.St
         response { engine.restore(packageName, transactionId, reporter(progress)) }
 
     @Synchronized override fun managedMods(): String = response { managed.list() }
+    @Synchronized override fun openManagedMods(): ParcelFileDescriptor = ResponsePipe.open(response { managed.list() })
     @Synchronized override fun stopGame(): String = response { GameProcess.stop(); "Stopped" }
     @Synchronized override fun storeMod(zip: ParcelFileDescriptor, id: String, legacyTransactions: String, progress: IProgress?): String =
         zip.use { response { managed.store(it, id, legacyTransactions, reporter(progress)) } }
     @Synchronized override fun setModActive(id: String, active: Boolean, progress: IProgress?): String =
         response { managed.setActive(id, active, reporter(progress)) }
+    @Synchronized override fun updateMod(zip: ParcelFileDescriptor, id: String, expectedArchiveHash: String, manifest: String, progress: IProgress?): String =
+        zip.use { response { managed.update(it, id, expectedArchiveHash, manifest, reporter(progress)) } }
+    @Synchronized override fun overwriteMod(zip: ParcelFileDescriptor, id: String, expectedArchiveHash: String,
+        incomingHash: String, developerMode: Boolean, publicationBaseUrl: String, progress: IProgress?): String =
+        zip.use { response { managed.overwrite(it, id, expectedArchiveHash, incomingHash, developerMode, publicationBaseUrl, reporter(progress)) } }
+    @Synchronized override fun writeDeveloperFiles(id: String, publicationBaseUrl: String): String =
+        response { managed.writeDeveloperFiles(id, publicationBaseUrl) }
     @Synchronized override fun deleteStoredMod(id: String, progress: IProgress?): String =
         response { managed.delete(id, reporter(progress)) }
     @Synchronized override fun warningAction(id: String, recover: Boolean, progress: IProgress?): String =

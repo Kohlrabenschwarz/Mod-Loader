@@ -4,6 +4,18 @@ android {
     compileSdk = 35
     defaultConfig { minSdk = 30; consumerProguardFiles("consumer-rules.pro"); testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     buildFeatures { aidl = true }
+    testOptions {
+        managedDevices {
+            devices {
+                create<com.android.build.api.dsl.ManagedVirtualDevice>("pixel2Api30") {
+                    device = "Pixel 2"; apiLevel = 30; systemImageSource = "aosp"
+                }
+                create<com.android.build.api.dsl.ManagedVirtualDevice>("pixel2Api35") {
+                    device = "Pixel 2"; apiLevel = 35; systemImageSource = "aosp"
+                }
+            }
+        }
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

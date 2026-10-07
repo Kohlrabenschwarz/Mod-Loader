@@ -36,3 +36,11 @@ Alternative payload prefixes are `Resources/Bundles/`, `files/gamedata/Resources
 Successful import confirms archive/path integrity, not Unity or game-version compatibility. Keep your own original copies and share only material you have the rights to distribute.
 
 If the loader rejects a package, start by comparing its archive root and `affectedFiles` list with this template. Do not remove validation checks to accommodate a malformed ZIP; correct the package instead.
+
+## Optional online updates
+
+Add a root `update.json`, a stable `modId`, and an increasing `versionCode` to support manual update checks. See [Mod updates](../docs/MOD_UPDATES.md) for the package/remote manifest format, SHA-256 validation, publication helper, and inactive replacement behavior. Packages without update metadata remain supported. Loader versions predating this feature reject `update.json`.
+
+## Large texture bundle limits
+
+Payload files may be up to **512 MiB each**, with a **1 GiB ZIP** and **2 GiB expanded payload** limit. These limits accommodate large uncompressed textures such as RGBA32 without loading the entire bundle into memory. ZIP64 and the 200:1 compression-ratio limit remain unchanged. Activation shows an estimate of additional free space; original backups and rollback may require substantially more space than the ZIP alone.

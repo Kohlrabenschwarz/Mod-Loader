@@ -32,7 +32,8 @@ class ShizukuManager(context: Context) : AutoCloseable {
     private var remoteBinder: IBinder? = null
     private val args = Shizuku.UserServiceArgs(ComponentName(context, PrivilegedFileService::class.java))
         .tag("modloader-v1-u${android.os.Process.myUid() / 100000}")
-        .version(14).processNameSuffix("modengine").daemon(false).debuggable(false)
+        // Restart an older backend before calling the developer/overwrite Binder methods.
+        .version(17).processNameSuffix("modengine").daemon(false).debuggable(false)
     private val timeout = Runnable { failAttempt() }
     private val retry = Runnable { beginAttempt() }
     private val death = IBinder.DeathRecipient { main.post { disconnected() } }
@@ -48,11 +49,13 @@ class ShizukuManager(context: Context) : AutoCloseable {
         }
         override fun onServiceDisconnected(name: ComponentName) { disconnected() }
     }
-    private val received = Shizuku.OnBinderReceivedListener { if (active) connectAttempt() }
+    private val received = Shizuku.OnBinderReceivedListener {
+        if (active) connectAttempt() else refreshConnection()
+    }
     private val dead = Shizuku.OnBinderDeadListener { disconnected() }
     private val permission = Shizuku.OnRequestPermissionResultListener { code, result ->
         if (code == REQUEST_CODE && active) {
-            if (result == PackageManager.PERMISSION_GRANTED) connectAttempt() else failAttempt()
+            if (result == PackageManager.PERMISSION_GRANTED) connectAttempt() else finishAttempt(ShizukuStatus.DENIED)
         }
     }
     init {
@@ -74,9 +77,12 @@ class ShizukuManager(context: Context) : AutoCloseable {
         try {
             if (!Shizuku.pingBinder()) return
             if (Shizuku.getVersion() < 13 || Shizuku.getUid() != 2000 || android.os.Process.myUid() / 100000 != 0) {
-                failAttempt(); return
+                finishAttempt(ShizukuStatus.UNSUPPORTED); return
             }
             if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+                if (permissionRequested || Shizuku.shouldShowRequestPermissionRationale()) {
+                    finishAttempt(ShizukuStatus.DENIED); return
+                }
                 mutableStatus.value = ShizukuStatus.PERMISSION_REQUIRED
                 if (!permissionRequested && !Shizuku.shouldShowRequestPermissionRationale()) {
                     permissionRequested = true
@@ -95,6 +101,27 @@ class ShizukuManager(context: Context) : AutoCloseable {
         active = false; detach()
         if (mutableAttempt.value >= 3) mutableStatus.value = ShizukuStatus.ERROR
         else { mutableStatus.value = ShizukuStatus.CONNECTING; main.postDelayed(retry, 1_000) }
+    }
+    private fun finishAttempt(status: ShizukuStatus) {
+        active = false; main.removeCallbacks(retry); detach(); mutableStatus.value = status
+    }
+    /** A newly delivered Binder or permission granted in Shizuku starts a new bounded round. */
+    fun refreshConnection() {
+        if (closed || active || mutableStatus.value == ShizukuStatus.READY) return
+        try {
+            if (!Shizuku.pingBinder()) return
+            if (mutableStatus.value == ShizukuStatus.DENIED &&
+                Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) return
+            mutableAttempt.value = 0
+            permissionRequested = false
+            beginAttempt()
+        } catch (_: Exception) { mutableStatus.value = ShizukuStatus.ERROR }
+    }
+    fun retryConnection() {
+        if (closed || mutableStatus.value == ShizukuStatus.READY) return
+        active = false; main.removeCallbacks(retry); detach()
+        mutableAttempt.value = 0; permissionRequested = false
+        beginAttempt()
     }
     private fun disconnected() {
         if (closed) return

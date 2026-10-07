@@ -55,10 +55,15 @@ private fun LoaderRoute(vm: LoaderViewModel) {
         onCheckUpdates = vm::checkUpdates,
         onUpdate = { vm.openUpdate { url -> context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) } },
         onImport = { picker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
+        onImportLink = vm::importLink,
         onPlay = { vm.play {
             val intent = context.packageManager.getLaunchIntentForPackage(GameTarget.PACKAGE_NAME)
                 ?: throw dev.modloader.domain.EngineFailure(10, "GAME_MISSING")
             context.startActivity(intent)
         } }, onLanguage = vm::language, onDark = vm::dark, onAccent = vm::accent,
+        onRetryConnection = vm.shizuku::retryConnection, onRepair = vm::repairArchive,
+        onCheckModUpdate = vm::checkModUpdate, onInstallModUpdate = vm::installModUpdate,
+        onDeveloperMode = vm::developerMode, onPublicationBaseUrl = vm::publicationBaseUrl,
+        onCancelImport = vm::cancelImport, onOverwriteImport = vm::overwriteImport,
         onToggle = vm::setActive, onDelete = vm::deleteMod, onWarningAction = vm::warningAction, onIgnore = vm::ignoreWarning)
 }
