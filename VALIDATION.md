@@ -25,7 +25,7 @@ All six UI language files have the same **149 string keys**. Popup menu, link di
 - ZIP/16 KiB page alignment verification passed.
 - Signing certificate SHA-256 matches the actual published 1.0.0 APK: `c458512cf92fc4fd9e10c71af75ada3d997894d55e5d88a9845810e3cd434055`.
 - The exact signed 1.0.0 APK was installed on the isolated emulator, then updated in place with the signed 1.1.0 APK. Android accepted the update and the production Activity launched successfully.
-- Final APK SHA-256: `9ba0dd4db79a76330941eb4b6bb902cf11a7c6623f46908a2c2e1573370eb732`.
+- Final APK SHA-256 is recorded in the GitHub release description and attached `.apk.sha256` file. The APK embeds its source commit, so checksums are calculated only after the final source commit.
 
 ## Limits of this verification
 
